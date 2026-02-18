@@ -33,6 +33,10 @@ interface FlowState {
   connections: Connection[];
   selectedNodeId: string | null;
   mode: 'editor' | 'preview';
+  ui: {
+    showPalette: boolean;
+    showEditor: boolean;
+  };
   
   // Actions
   setNodes: (nodes: Node[]) => void;
@@ -46,6 +50,9 @@ interface FlowState {
   deleteConnection: (id: string) => void;
   
   setMode: (mode: 'editor' | 'preview') => void;
+  togglePalette: () => void;
+  toggleEditor: () => void;
+  setEditorOpen: (open: boolean) => void;
 }
 
 // ------------------------------------------------------------------
@@ -84,6 +91,10 @@ export const useFlowStore = create<FlowState>((set) => ({
   connections: initialConnections,
   selectedNodeId: null,
   mode: 'editor',
+  ui: {
+    showPalette: true,
+    showEditor: true
+  },
 
   setNodes: (nodes) => set({ nodes }),
 
@@ -98,7 +109,7 @@ export const useFlowStore = create<FlowState>((set) => ({
         options: type === 'choice' ? [] : undefined,
       },
     };
-    return { nodes: [...state.nodes, newNode], selectedNodeId: newNode.id };
+    return { nodes: [...state.nodes, newNode], selectedNodeId: newNode.id, ui: { ...state.ui, showEditor: true } }; // Auto-open editor
   }),
 
   updateNode: (id, data) => set((state) => ({
@@ -119,7 +130,16 @@ export const useFlowStore = create<FlowState>((set) => ({
     selectedNodeId: state.selectedNodeId === id ? null : state.selectedNodeId,
   })),
 
-  selectNode: (id) => set({ selectedNodeId: id }),
+  selectNode: (id) => set((state) => ({ 
+      selectedNodeId: id,
+      ui: { ...state.ui, showEditor: !!id || state.ui.showEditor } // Optional: auto-open if selecting, keep open if deselecting? Let's just update `selectedNodeId` and let user control visibility, OR auto-open on select. 
+      // User request: "provide ways to open and close". Auto-open on select is standard.
+      // If id is null (deselect), maybe don't auto-close? 
+      // Let's sticking to Manual control + Auto-open on NEW node.
+      // Actually, standard behavior: Select node -> Editor shows properties. Deselect -> Editor shows "Select node".
+      // But user wants to HIDE the panel.
+      // So let's leave visibility control explicit, except maybe for Add Node.
+  })),
 
   addConnection: (connection) => set((state) => ({
     connections: [...state.connections, { ...connection, id: uuidv4() }],
@@ -130,4 +150,8 @@ export const useFlowStore = create<FlowState>((set) => ({
   })),
 
   setMode: (mode) => set({ mode }),
+  
+  togglePalette: () => set((state) => ({ ui: { ...state.ui, showPalette: !state.ui.showPalette } })),
+  toggleEditor: () => set((state) => ({ ui: { ...state.ui, showEditor: !state.ui.showEditor } })),
+  setEditorOpen: (open) => set((state) => ({ ui: { ...state.ui, showEditor: open } })),
 }));

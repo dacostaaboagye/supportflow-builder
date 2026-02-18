@@ -46,7 +46,10 @@ export function FlowCanvas() {
       const zoomSensitivity = 0.001;
 
       setTransform((prev) => {
-        const newZoom = Math.min(Math.max(prev.zoom - deltaY * zoomSensitivity, 0.1), 5);
+        const newZoom = Math.min(
+          Math.max(prev.zoom - deltaY * zoomSensitivity, 0.1),
+          5,
+        );
 
         // Optional: zoom around cursor
         if (!containerRef.current) return { ...prev, zoom: newZoom };
@@ -61,32 +64,42 @@ export function FlowCanvas() {
       });
     } else {
       // Regular pan
-      setTransform((prev) => ({ ...prev, x: prev.x - deltaX, y: prev.y - deltaY }));
+      setTransform((prev) => ({
+        ...prev,
+        x: prev.x - deltaX,
+        y: prev.y - deltaY,
+      }));
     }
   }, []);
 
   // Mouse down: start panning or deselect
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    const isPan = e.button === 1 || (e.button === 0 && isSpacePressed);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      const isPan = e.button === 1 || (e.button === 0 && isSpacePressed);
 
-    if (isPan) {
-      e.preventDefault();
-      setIsPanning(true);
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-    } else if (e.target === containerRef.current) {
-      selectNode(null);
-    }
-  }, [isSpacePressed, selectNode]);
+      if (isPan) {
+        e.preventDefault();
+        setIsPanning(true);
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+      } else if (e.target === containerRef.current) {
+        selectNode(null);
+      }
+    },
+    [isSpacePressed, selectNode],
+  );
 
   // Mouse move: pan
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (isPanning) {
-      const dx = e.clientX - lastMousePos.current.x;
-      const dy = e.clientY - lastMousePos.current.y;
-      setTransform((prev) => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-    }
-  }, [isPanning]);
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (isPanning) {
+        const dx = e.clientX - lastMousePos.current.x;
+        const dy = e.clientY - lastMousePos.current.y;
+        setTransform((prev) => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+      }
+    },
+    [isPanning],
+  );
 
   // Mouse up: stop panning
   const handleMouseUp = useCallback(() => setIsPanning(false), []);
@@ -104,19 +117,61 @@ export function FlowCanvas() {
     return () => container.removeEventListener("wheel", preventDefault);
   }, []);
 
+  // Drag over: allow drop
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
+
+  // Drop: create new node
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const type = event.dataTransfer.getData("application/reactflow") as
+        | "message"
+        | "choice";
+
+      // check if the dropped element is valid
+      if (typeof type === "undefined" || !type) {
+        return;
+      }
+
+      // Calculate position
+      // We need to convert screen coordinates (event.clientX/Y) to canvas coordinates
+      // taking into account the transform (x, y, zoom)
+      if (containerRef.current) {
+        const reactFlowBounds = containerRef.current.getBoundingClientRect();
+        const position = {
+          x:
+            (event.clientX - reactFlowBounds.left - transform.x) /
+            transform.zoom,
+          y:
+            (event.clientY - reactFlowBounds.top - transform.y) /
+            transform.zoom,
+        };
+
+        useFlowStore.getState().addNode(type, position);
+      }
+    },
+    [transform],
+  );
+
   return (
     <div
       ref={containerRef}
       className={cn(
         "w-full h-full overflow-hidden bg-canvas-bg relative cursor-default",
         isSpacePressed && !isPanning && "cursor-grab",
-        isPanning && "cursor-grabbing"
+        isPanning && "cursor-grabbing",
       )}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
     >
       {/* Transform Container */}
       <div

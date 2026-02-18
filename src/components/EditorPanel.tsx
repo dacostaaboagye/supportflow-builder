@@ -7,21 +7,38 @@ import {
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
-// import { Label } from '../components/ui/label'; // If we had a label component, using raw label for now
+import { X } from "lucide-react";
 
 export function EditorPanel() {
-  const { selectedNodeId, nodes, updateNode, deleteNode } = useFlowStore();
+  const { selectedNodeId, nodes, updateNode, deleteNode, setEditorOpen } =
+    useFlowStore();
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
+
+  // ... (no selected node check logic remains same, but maybe we want to allow closing empty panel too?)
+  // Actually, if !selectedNode, we show "Select a node". We should allow closing that too.
 
   if (!selectedNode) {
     return (
-      <Card className="w-80 h-full border-l rounded-none border-border bg-surface shadow-none absolute right-0 top-0 pointer-events-auto">
+      <Card className="w-80 h-full border-l rounded-none border-border bg-surface shadow-none absolute right-0 top-0 pointer-events-auto flex flex-col">
+        <CardHeader className="flex flex-row items-center justify-between border-b p-4 h-14">
+          <span className="text-sm font-semibold">Inspector</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setEditorOpen(false)}
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </CardHeader>
         <CardContent className="pt-6 text-center text-text-muted">
           <p>Select a node to edit</p>
         </CardContent>
       </Card>
     );
   }
+
+  // ... handlers ...
 
   const handleChange = (field: string, value: string) => {
     updateNode(selectedNode.id, { [field]: value });
@@ -55,8 +72,16 @@ export function EditorPanel() {
 
   return (
     <Card className="w-80 h-full border-l rounded-none border-border bg-surface shadow-xl absolute right-0 top-0 flex flex-col pointer-events-auto">
-      <CardHeader className="border-b border-border bg-surface-muted/30">
+      <CardHeader className="border-b border-border bg-surface-muted/30 flex flex-row items-center justify-between p-4 py-3">
         <CardTitle className="text-lg">Node Inspector</CardTitle>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0"
+          onClick={() => setEditorOpen(false)}
+        >
+          <X className="w-4 h-4" />
+        </Button>
       </CardHeader>
       <CardContent className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Node Type Badge */}

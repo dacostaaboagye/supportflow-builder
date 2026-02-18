@@ -67,6 +67,28 @@ export function Toolbar() {
   return (
     <div className="absolute top-4 left-4 flex gap-2 z-50">
       <Button
+        variant={
+          useFlowStore((s) => s.ui.showPalette) ? "primary" : "secondary"
+        }
+        size="sm"
+        onClick={() => useFlowStore.getState().togglePalette()}
+        title="Toggle Nodes Palette"
+      >
+        <span className="text-lg leading-none">+</span>
+      </Button>
+
+      <Button
+        variant={useFlowStore((s) => s.ui.showEditor) ? "primary" : "secondary"}
+        size="sm"
+        onClick={() => useFlowStore.getState().toggleEditor()}
+        title="Toggle Inspector"
+      >
+        <span className="text-lg leading-none">i</span>
+      </Button>
+
+      <div className="w-px h-8 bg-border mx-1" />
+
+      <Button
         variant="secondary"
         size="sm"
         onClick={handleExport}
