@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useFlowStore } from "../../stores/flowStore";
 import { DraggableNode } from "./DraggableNode";
 import { ConnectionLayer } from "./ConnectionLayer";
@@ -6,64 +6,92 @@ import { cn } from "../../lib/utils";
 
 export function FlowCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastMousePos = useRef({ x: 0, y: 0 });
+
   const [transform, setTransform] = useState({ x: 0, y: 0, zoom: 1 });
   const [isPanning, setIsPanning] = useState(false);
-  const lastMousePos = useRef({ x: 0, y: 0 });
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
 
   const { nodes, selectNode } = useFlowStore();
 
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      // Zoom logic
-      if (e.ctrlKey || e.metaKey) {
+  // Track Space key for panning
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
         e.preventDefault();
-        const zoomSensitivity = 0.001;
-        const newZoom = Math.min(
-          Math.max(transform.zoom - e.deltaY * zoomSensitivity, 0.1),
-          5,
-        );
-        setTransform((prev) => ({ ...prev, zoom: newZoom }));
-      } else {
-        // Pan logic if no modifier
-        setTransform((prev) => ({
-          ...prev,
-          x: prev.x - e.deltaX,
-          y: prev.y - e.deltaY,
-        }));
+        setIsSpacePressed(true);
       }
-    },
-    [transform.zoom],
-  );
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        setIsSpacePressed(false);
+      }
+    };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // Middle mouse or Space+LeftClick to pan
-    if (
-      e.button === 1 ||
-      (e.button === 0 && e.nativeEvent.getModifierState("Space"))
-    ) {
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
+  // Wheel: zoom with Ctrl/Cmd, otherwise pan
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    const { clientX, clientY, deltaX, deltaY, ctrlKey, metaKey } = e;
+
+    if (ctrlKey || metaKey) {
+      e.preventDefault();
+      const zoomSensitivity = 0.001;
+
+      setTransform((prev) => {
+        const newZoom = Math.min(Math.max(prev.zoom - deltaY * zoomSensitivity, 0.1), 5);
+
+        // Optional: zoom around cursor
+        if (!containerRef.current) return { ...prev, zoom: newZoom };
+        const rect = containerRef.current.getBoundingClientRect();
+        const offsetX = clientX - rect.left;
+        const offsetY = clientY - rect.top;
+
+        const dx = offsetX - (offsetX - prev.x) * (newZoom / prev.zoom);
+        const dy = offsetY - (offsetY - prev.y) * (newZoom / prev.zoom);
+
+        return { x: dx, y: dy, zoom: newZoom };
+      });
+    } else {
+      // Regular pan
+      setTransform((prev) => ({ ...prev, x: prev.x - deltaX, y: prev.y - deltaY }));
+    }
+  }, []);
+
+  // Mouse down: start panning or deselect
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const isPan = e.button === 1 || (e.button === 0 && isSpacePressed);
+
+    if (isPan) {
+      e.preventDefault();
       setIsPanning(true);
       lastMousePos.current = { x: e.clientX, y: e.clientY };
-      e.preventDefault();
     } else if (e.target === containerRef.current) {
-      // Deselect if clicking on empty canvas
       selectNode(null);
     }
-  };
+  }, [isSpacePressed, selectNode]);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  // Mouse move: pan
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
       setTransform((prev) => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     }
-  };
+  }, [isPanning]);
 
-  const handleMouseUp = () => {
-    setIsPanning(false);
-  };
+  // Mouse up: stop panning
+  const handleMouseUp = useCallback(() => setIsPanning(false), []);
 
-  // Prevent default browser zoom behavior
+  // Prevent browser zoom
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -81,7 +109,8 @@ export function FlowCanvas() {
       ref={containerRef}
       className={cn(
         "w-full h-full overflow-hidden bg-canvas-bg relative cursor-default",
-        isPanning && "cursor-grabbing",
+        isSpacePressed && !isPanning && "cursor-grab",
+        isPanning && "cursor-grabbing"
       )}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -102,7 +131,6 @@ export function FlowCanvas() {
         }}
       >
         <ConnectionLayer />
-
         {nodes.map((node) => (
           <DraggableNode key={node.id} node={node} zoom={transform.zoom} />
         ))}

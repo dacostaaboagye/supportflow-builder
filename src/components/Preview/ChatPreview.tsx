@@ -18,7 +18,7 @@ interface ChatMessage {
 }
 
 export function ChatPreview() {
-  const { nodes, setMode, connections } = useFlowStore();
+  const { nodes, setMode } = useFlowStore();
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [currentNode, setCurrentNode] = useState<Node | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
