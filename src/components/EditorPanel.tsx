@@ -1,0 +1,142 @@
+import { useFlowStore } from "../stores/flowStore";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Button } from "../components/ui/button";
+// import { Label } from '../components/ui/label'; // If we had a label component, using raw label for now
+
+export function EditorPanel() {
+  const { selectedNodeId, nodes, updateNode, deleteNode } = useFlowStore();
+  const selectedNode = nodes.find((n) => n.id === selectedNodeId);
+
+  if (!selectedNode) {
+    return (
+      <Card className="w-80 h-full border-l rounded-none border-border bg-surface shadow-none absolute right-0 top-0 pointer-events-auto">
+        <CardContent className="pt-6 text-center text-text-muted">
+          <p>Select a node to edit</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const handleChange = (field: string, value: string) => {
+    updateNode(selectedNode.id, { [field]: value });
+  };
+
+  const handleAddOption = () => {
+    const currentOptions = selectedNode.data.options || [];
+    updateNode(selectedNode.id, {
+      options: [
+        ...currentOptions,
+        { id: crypto.randomUUID(), label: "New Option" },
+      ],
+    });
+  };
+
+  const handleUpdateOption = (optionId: string, label: string) => {
+    const currentOptions = selectedNode.data.options || [];
+    updateNode(selectedNode.id, {
+      options: currentOptions.map((opt) =>
+        opt.id === optionId ? { ...opt, label } : opt,
+      ),
+    });
+  };
+
+  const handleDeleteOption = (optionId: string) => {
+    const currentOptions = selectedNode.data.options || [];
+    updateNode(selectedNode.id, {
+      options: currentOptions.filter((opt) => opt.id !== optionId),
+    });
+  };
+
+  return (
+    <Card className="w-80 h-full border-l rounded-none border-border bg-surface shadow-xl absolute right-0 top-0 flex flex-col pointer-events-auto">
+      <CardHeader className="border-b border-border bg-surface-muted/30">
+        <CardTitle className="text-lg">Node Inspector</CardTitle>
+      </CardHeader>
+      <CardContent className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Node Type Badge */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono uppercase bg-primary/10 text-primary px-2 py-1 rounded">
+            {selectedNode.type}
+          </span>
+          <span className="text-xs text-text-muted font-mono truncate">
+            {selectedNode.id}
+          </span>
+        </div>
+
+        {/* Label */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            Node Title
+          </label>
+          <Input
+            value={selectedNode.data.label}
+            onChange={(e) => handleChange("label", e.target.value)}
+          />
+        </div>
+
+        {/* Content */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            Bot Message
+          </label>
+          <textarea
+            className="flex min-h-[80px] w-full rounded-md border border-border bg-bg-surface px-3 py-2 text-sm ring-offset-surface placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+            value={selectedNode.data.content}
+            onChange={(e) => handleChange("content", e.target.value)}
+          />
+        </div>
+
+        {/* Options (Only for Choice nodes) */}
+        {selectedNode.type === "choice" && (
+          <div className="space-y-3 pt-4 border-t border-border">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Branches</label>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleAddOption}
+                className="h-6 text-xs text-primary"
+              >
+                + Add
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {selectedNode.data.options?.map((opt) => (
+                <div key={opt.id} className="flex gap-2">
+                  <Input
+                    value={opt.label}
+                    onChange={(e) => handleUpdateOption(opt.id, e.target.value)}
+                    className="h-8"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-text-muted hover:text-destructive"
+                    onClick={() => handleDeleteOption(opt.id)}
+                  >
+                    ×
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+      <div className="p-4 border-t border-border bg-surface-muted/10">
+        <Button
+          variant="destructive"
+          className="w-full"
+          onClick={() => deleteNode(selectedNode.id)}
+        >
+          Delete Node
+        </Button>
+      </div>
+    </Card>
+  );
+}
