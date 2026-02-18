@@ -3,73 +3,160 @@ import { useFlowStore } from "../../stores/flowStore";
 import { DraggableNode } from "./DraggableNode";
 import { ConnectionLayer } from "./ConnectionLayer";
 import { cn } from "../../lib/utils";
+import type { NodeType, Position } from "../../types";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface CanvasTransform {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+// ---------------------------------------------------------------------------
+// Sub-component: zoom / run controls overlay
+// ---------------------------------------------------------------------------
+
+interface CanvasControlsProps {
+  zoom: number;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onRun: () => void;
+}
+
+function CanvasControls({
+  zoom,
+  onZoomIn,
+  onZoomOut,
+  onRun,
+}: CanvasControlsProps) {
+  return (
+    <div className="absolute bottom-4 left-4 bg-surface p-2 rounded-md shadow-md border border-border flex gap-2 items-center">
+      <button
+        className="px-2 py-1 hover:bg-surface-hover rounded text-text-main"
+        onClick={onZoomOut}
+      >
+        −
+      </button>
+      <span className="text-sm font-mono flex items-center min-w-[3ch] justify-center">
+        {Math.round(zoom * 100)}%
+      </span>
+      <button
+        className="px-2 py-1 hover:bg-surface-hover rounded text-text-main"
+        onClick={onZoomIn}
+      >
+        +
+      </button>
+
+      <div className="w-px h-4 bg-border mx-1" />
+
+      <button
+        className="px-3 py-1 bg-primary text-primary-foreground hover:bg-primary-hover rounded text-sm font-medium flex items-center gap-1 shadow-sm transition-colors"
+        onClick={onRun}
+      >
+        ▶ Run
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 5;
+const ZOOM_SENSITIVITY = 0.001;
+const ZOOM_STEP = 0.1;
+
+/** Returns true if the keyboard event target is a text-entry element. */
+function isTextInput(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.isContentEditable
+  );
+}
+
+/** Convert screen coordinates to canvas-space coordinates. */
+function screenToCanvas(
+  screenX: number,
+  screenY: number,
+  containerRect: DOMRect,
+  transform: CanvasTransform,
+): Position {
+  return {
+    x: (screenX - containerRect.left - transform.x) / transform.zoom,
+    y: (screenY - containerRect.top - transform.y) / transform.zoom,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
 
 export function FlowCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const lastMousePos = useRef({ x: 0, y: 0 });
+  const lastMousePos = useRef<Position>({ x: 0, y: 0 });
 
-  const [transform, setTransform] = useState({ x: 0, y: 0, zoom: 1 });
+  const [transform, setTransform] = useState<CanvasTransform>({
+    x: 0,
+    y: 0,
+    zoom: 1,
+  });
   const [isPanning, setIsPanning] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
 
   const { nodes, selectNode } = useFlowStore();
 
-  // Track Space key for panning
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isInput =
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable;
+  // -- Space key for panning ------------------------------------------------
 
-      if (e.code === "Space" && !isInput) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space" && !isTextInput(e.target)) {
         e.preventDefault();
         setIsSpacePressed(true);
       }
     };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
-        setIsSpacePressed(false);
-      }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") setIsSpacePressed(false);
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
     };
   }, []);
 
-  // Wheel: zoom with Ctrl/Cmd, otherwise pan
+  // -- Wheel: zoom with Ctrl/Cmd, otherwise pan ----------------------------
+
   const handleWheel = useCallback((e: React.WheelEvent) => {
     const { clientX, clientY, deltaX, deltaY, ctrlKey, metaKey } = e;
 
     if (ctrlKey || metaKey) {
       e.preventDefault();
-      const zoomSensitivity = 0.001;
-
       setTransform((prev) => {
         const newZoom = Math.min(
-          Math.max(prev.zoom - deltaY * zoomSensitivity, 0.1),
-          5,
+          Math.max(prev.zoom - deltaY * ZOOM_SENSITIVITY, MIN_ZOOM),
+          MAX_ZOOM,
         );
-
-        // Optional: zoom around cursor
         if (!containerRef.current) return { ...prev, zoom: newZoom };
+
         const rect = containerRef.current.getBoundingClientRect();
         const offsetX = clientX - rect.left;
         const offsetY = clientY - rect.top;
-
-        const dx = offsetX - (offsetX - prev.x) * (newZoom / prev.zoom);
-        const dy = offsetY - (offsetY - prev.y) * (newZoom / prev.zoom);
-
-        return { x: dx, y: dy, zoom: newZoom };
+        return {
+          x: offsetX - (offsetX - prev.x) * (newZoom / prev.zoom),
+          y: offsetY - (offsetY - prev.y) * (newZoom / prev.zoom),
+          zoom: newZoom,
+        };
       });
     } else {
-      // Regular pan
       setTransform((prev) => ({
         ...prev,
         x: prev.x - deltaX,
@@ -78,12 +165,13 @@ export function FlowCanvas() {
     }
   }, []);
 
-  // Mouse down: start panning or deselect
+  // -- Mouse down: start panning or deselect --------------------------------
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      const isPan = e.button === 1 || (e.button === 0 && isSpacePressed);
+      const shouldPan = e.button === 1 || (e.button === 0 && isSpacePressed);
 
-      if (isPan) {
+      if (shouldPan) {
         e.preventDefault();
         setIsPanning(true);
         lastMousePos.current = { x: e.clientX, y: e.clientY };
@@ -94,10 +182,10 @@ export function FlowCanvas() {
     [isSpacePressed, selectNode],
   );
 
-  // Mouse move: pan or update connection line
+  // -- Mouse move: pan + connection drawing ---------------------------------
+
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
-      // 1. Pan logic
       if (isPanning) {
         const dx = e.clientX - lastMousePos.current.x;
         const dy = e.clientY - lastMousePos.current.y;
@@ -105,82 +193,86 @@ export function FlowCanvas() {
         lastMousePos.current = { x: e.clientX, y: e.clientY };
       }
 
-      // 2. Connection Line Logic
       const { ui, updateConnectionMousePos } = useFlowStore.getState();
       if (ui.connectionPending && containerRef.current) {
-        // Convert screen to canvas coords
         const rect = containerRef.current.getBoundingClientRect();
-        const x = (e.clientX - rect.left - transform.x) / transform.zoom;
-        const y = (e.clientY - rect.top - transform.y) / transform.zoom;
-        updateConnectionMousePos({ x, y });
+        updateConnectionMousePos(
+          screenToCanvas(e.clientX, e.clientY, rect, transform),
+        );
       }
     },
     [isPanning, transform],
   );
 
-  // Mouse up: stop panning OR connection
+  // -- Mouse up: stop panning / cancel connection ---------------------------
+
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
-
-    // If we release mouse anywhere that is NOT a handle (handled by DraggableNode onMouseUp), cancel connection
     const { ui, endConnection } = useFlowStore.getState();
-    if (ui.connectionPending) {
-      endConnection();
-    }
+    if (ui.connectionPending) endConnection();
   }, []);
 
-  // Prevent browser zoom
+  // -- Prevent browser zoom on canvas ---------------------------------------
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const preventDefault = (e: WheelEvent) => {
+    const prevent = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) e.preventDefault();
     };
-
-    container.addEventListener("wheel", preventDefault, { passive: false });
-    return () => container.removeEventListener("wheel", preventDefault);
+    container.addEventListener("wheel", prevent, { passive: false });
+    return () => container.removeEventListener("wheel", prevent);
   }, []);
 
-  // Drag over: allow drop
-  const onDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
+  // -- Drag & drop: create new nodes ----------------------------------------
+
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
   }, []);
 
-  // Drop: create new node
   const onDrop = useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault();
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const type = e.dataTransfer.getData("application/reactflow") as
+        | NodeType
+        | "";
+      if (!type) return;
 
-      const type = event.dataTransfer.getData("application/reactflow") as
-        | "message"
-        | "choice";
-
-      // check if the dropped element is valid
-      if (typeof type === "undefined" || !type) {
-        return;
-      }
-
-      // Calculate position
-      // We need to convert screen coordinates (event.clientX/Y) to canvas coordinates
-      // taking into account the transform (x, y, zoom)
       if (containerRef.current) {
-        const reactFlowBounds = containerRef.current.getBoundingClientRect();
-        const position = {
-          x:
-            (event.clientX - reactFlowBounds.left - transform.x) /
-            transform.zoom,
-          y:
-            (event.clientY - reactFlowBounds.top - transform.y) /
-            transform.zoom,
-        };
-
-        useFlowStore.getState().addNode(type, position);
+        const rect = containerRef.current.getBoundingClientRect();
+        const position = screenToCanvas(e.clientX, e.clientY, rect, transform);
+        useFlowStore.getState().addNode(type as NodeType, position);
       }
     },
     [transform],
   );
+
+  // -- Zoom callbacks for controls ------------------------------------------
+
+  const handleZoomIn = useCallback(
+    () =>
+      setTransform((t) => ({
+        ...t,
+        zoom: Math.min(t.zoom + ZOOM_STEP, MAX_ZOOM),
+      })),
+    [],
+  );
+  const handleZoomOut = useCallback(
+    () =>
+      setTransform((t) => ({
+        ...t,
+        zoom: Math.max(t.zoom - ZOOM_STEP, MIN_ZOOM),
+      })),
+    [],
+  );
+  const handleRun = useCallback(
+    () => useFlowStore.getState().setMode("preview"),
+    [],
+  );
+
+  // -- Render ---------------------------------------------------------------
 
   return (
     <div
@@ -198,7 +290,6 @@ export function FlowCanvas() {
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
-      {/* Transform Container */}
       <div
         style={{
           transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`,
@@ -216,33 +307,12 @@ export function FlowCanvas() {
         ))}
       </div>
 
-      {/* Controls Overlay */}
-      <div className="absolute bottom-4 left-4 bg-surface p-2 rounded-md shadow-md border border-border flex gap-2 items-center">
-        <button
-          className="px-2 py-1 hover:bg-surface-hover rounded text-text-main"
-          onClick={() => setTransform((t) => ({ ...t, zoom: t.zoom - 0.1 }))}
-        >
-          -
-        </button>
-        <span className="text-sm font-mono flex items-center min-w-[3ch] justify-center">
-          {Math.round(transform.zoom * 100)}%
-        </span>
-        <button
-          className="px-2 py-1 hover:bg-surface-hover rounded text-text-main"
-          onClick={() => setTransform((t) => ({ ...t, zoom: t.zoom + 0.1 }))}
-        >
-          +
-        </button>
-
-        <div className="w-px h-4 bg-border mx-1" />
-
-        <button
-          className="px-3 py-1 bg-primary text-primary-foreground hover:bg-primary-hover rounded text-sm font-medium flex items-center gap-1 shadow-sm transition-colors"
-          onClick={() => useFlowStore.getState().setMode("preview")}
-        >
-          ▶ Run
-        </button>
-      </div>
+      <CanvasControls
+        zoom={transform.zoom}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onRun={handleRun}
+      />
     </div>
   );
 }

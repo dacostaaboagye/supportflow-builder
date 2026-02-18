@@ -2,14 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { MessageSquare, List, X } from "lucide-react";
 import { useFlowStore } from "../stores/flowStore";
 import { Button } from "./ui/button";
+import type { NodeType } from "../types";
 
 export function NodesPalette() {
   const { togglePalette } = useFlowStore();
 
-  const onDragStart = (
-    event: React.DragEvent,
-    nodeType: "message" | "choice",
-  ) => {
+  const onDragStart = (event: React.DragEvent, nodeType: NodeType) => {
     event.dataTransfer.setData("application/reactflow", nodeType);
     event.dataTransfer.effectAllowed = "move";
   };

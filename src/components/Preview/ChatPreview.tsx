@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useFlowStore, type Node } from "../../stores/flowStore";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useFlowStore } from "../../stores/flowStore";
 import {
   Card,
   CardContent,
@@ -10,6 +10,11 @@ import {
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
 import { X, RefreshCcw } from "lucide-react";
+import type { FlowNode } from "../../types";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface ChatMessage {
   id: string;
@@ -17,33 +22,18 @@ interface ChatMessage {
   text: string;
 }
 
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
 export function ChatPreview() {
   const { nodes, setMode } = useFlowStore();
   const [history, setHistory] = useState<ChatMessage[]>([]);
-  const [currentNode, setCurrentNode] = useState<Node | null>(null);
+  const [currentNode, setCurrentNode] = useState<FlowNode | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Initialize
-  useEffect(() => {
-    // Find root node (assuming first node or specific root)
-    // In our data, rootId was in JSON but we loaded flatten nodes.
-    // We can assume the first node is root, or find one with no incoming connections (not fully reliable if loops).
-    // For now, let's pick the first node in the list as Start.
-    if (nodes.length > 0) {
-      processNode(nodes[0]);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [history]);
-
-  const processNode = (node: Node) => {
+  const processNode = useCallback((node: FlowNode) => {
     setCurrentNode(node);
-
-    // Add bot message
     setHistory((prev) => [
       ...prev,
       {
@@ -52,32 +42,33 @@ export function ChatPreview() {
         text: node.data.content || "...",
       },
     ]);
+  }, []);
 
-    // If it's a statement node (no options but maybe a direct link?), we might auto-proceed?
-    // Current logic: Options drive navigation. If no options, it's a leaf node or dead end.
-  };
+  // Initialise with the first node
+  useEffect(() => {
+    if (nodes.length > 0) processNode(nodes[0]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [history]);
 
   const handleOptionClick = (optionLabel: string, optionId: string) => {
-    // Add user message
     setHistory((prev) => [
       ...prev,
-      {
-        id: crypto.randomUUID(),
-        sender: "user",
-        text: optionLabel,
-      },
+      { id: crypto.randomUUID(), sender: "user", text: optionLabel },
     ]);
 
-    // Find connection from this node + this option handle
     const { connections } = useFlowStore.getState();
     const connection = connections.find(
       (c) => c.sourceId === currentNode?.id && c.sourceHandle === optionId,
     );
 
-    // Also support legacy nextId if present (backward compatibility)
-    let nextNodeId = connection?.targetId;
-
-    // If we have connection, use it.
+    const nextNodeId = connection?.targetId;
     if (nextNodeId) {
       const nextNode = nodes.find((n) => n.id === nextNodeId);
       if (nextNode) {
@@ -86,7 +77,6 @@ export function ChatPreview() {
         setCurrentNode(null);
       }
     } else {
-      // Legacy fallback? Or End.
       setCurrentNode(null);
     }
   };
@@ -131,7 +121,7 @@ export function ChatPreview() {
               className={cn(
                 "max-w-[80%] rounded-lg p-3 text-sm animate-in slide-in-from-bottom-2 duration-300",
                 msg.sender === "bot"
-                  ? "bg-white border border-border text-text-main self-start rounded-tl-none"
+                  ? "bg-surface border border-border text-text-main self-start rounded-tl-none"
                   : "bg-primary text-primary-foreground self-end ml-auto rounded-tr-none",
               )}
             >
@@ -139,29 +129,27 @@ export function ChatPreview() {
             </div>
           ))}
 
-          {/* Options Area */}
-          {currentNode &&
-            currentNode.type === "choice" &&
-            currentNode.data.options && (
-              <div className="flex flex-wrap gap-2 mt-4 justify-end">
-                {currentNode.data.options.map((opt) => (
-                  <Button
-                    key={opt.id}
-                    variant="secondary"
-                    size="sm"
-                    className="rounded-full animate-in fade-in duration-500"
-                    onClick={() => handleOptionClick(opt.label, opt.id)}
-                  >
-                    {opt.label}
-                  </Button>
-                ))}
-              </div>
-            )}
+          {/* Options */}
+          {currentNode?.type === "choice" && currentNode.data.options && (
+            <div className="flex flex-wrap gap-2 mt-4 justify-end">
+              {currentNode.data.options.map((opt) => (
+                <Button
+                  key={opt.id}
+                  variant="secondary"
+                  size="sm"
+                  className="rounded-full animate-in fade-in duration-500"
+                  onClick={() => handleOptionClick(opt.label, opt.id)}
+                >
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
+          )}
 
-          {/* End of Conversation */}
+          {/* End of conversation */}
           {!currentNode && history.length > 0 && (
             <div className="text-center text-xs text-text-muted mt-8">
-              - Conversation Ended -
+              — Conversation Ended —
             </div>
           )}
         </CardContent>

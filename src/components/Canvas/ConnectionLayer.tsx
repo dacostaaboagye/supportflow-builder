@@ -1,13 +1,132 @@
-import { getHandleCoords } from "@/lib/getHandleCoords";
 import { useFlowStore } from "../../stores/flowStore";
+import { getHandleCoords } from "../../lib/getHandleCoords";
+import type {
+  FlowConnection,
+  FlowNode,
+  Position,
+  ConnectionPending,
+} from "../../types";
+
+// ---------------------------------------------------------------------------
+// Constants — use CSS custom properties from the design tokens
+// ---------------------------------------------------------------------------
+
+const CONNECTOR_COLOR = "var(--color-connector)";
+const ACTIVE_COLOR = "var(--color-primary)";
+
+// ---------------------------------------------------------------------------
+// Sub-component: Bezier path between two points
+// ---------------------------------------------------------------------------
+
+interface BezierPathProps {
+  from: Position;
+  to: Position;
+  stroke: string;
+  dashed?: boolean;
+  markerId: string;
+}
+
+function BezierPath({
+  from,
+  to,
+  stroke,
+  dashed,
+  markerId,
+}: Readonly<BezierPathProps>) {
+  const dist = Math.abs(to.x - from.x);
+  const controlOffset = Math.max(dist * 0.5, 50);
+
+  const d = `M ${from.x} ${from.y} C ${from.x + controlOffset} ${from.y}, ${
+    to.x - controlOffset
+  } ${to.y}, ${to.x} ${to.y}`;
+
+  return (
+    <path
+      d={d}
+      stroke={stroke}
+      strokeWidth="2"
+      fill="none"
+      strokeDasharray={dashed ? "5,5" : undefined}
+      markerEnd={`url(#${markerId})`}
+      style={dashed ? undefined : { opacity: 0.8 }}
+      className={dashed ? "animate-pulse" : undefined}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-component: A single committed connection
+// ---------------------------------------------------------------------------
+
+function ConnectionPath({
+  connection,
+  nodes,
+}: Readonly<{
+  connection: FlowConnection;
+  nodes: FlowNode[];
+}>) {
+  const source = nodes.find((n) => n.id === connection.sourceId);
+  const target = nodes.find((n) => n.id === connection.targetId);
+  if (!source || !target) return null;
+
+  const from = getHandleCoords(
+    connection.sourceId,
+    source.position,
+    connection.sourceHandle,
+  );
+  const to = getHandleCoords(
+    connection.targetId,
+    target.position,
+    connection.targetHandle,
+  );
+
+  return (
+    <g>
+      <BezierPath
+        from={from}
+        to={to}
+        stroke={CONNECTOR_COLOR}
+        markerId="arrowhead"
+      />
+    </g>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-component: The dashed line drawn while dragging a new connection
+// ---------------------------------------------------------------------------
+
+function PendingConnectionPath({
+  pending,
+  nodes,
+}: Readonly<{ pending: ConnectionPending; nodes: FlowNode[] }>) {
+  const sourceNode = nodes.find((n) => n.id === pending.sourceId);
+  if (!sourceNode) return null;
+
+  const from = getHandleCoords(
+    pending.sourceId,
+    sourceNode.position,
+    pending.sourceHandle,
+  );
+  const to = pending.mousePos;
+
+  return (
+    <BezierPath
+      from={from}
+      to={to}
+      stroke={ACTIVE_COLOR}
+      dashed
+      markerId="arrowhead-active"
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 export function ConnectionLayer() {
   const { connections, nodes, ui } = useFlowStore();
-
-  const getNodeData = (nodeId: string) => {
-    const node = nodes.find((n) => n.id === nodeId);
-    return node ? { x: node.position.x, y: node.position.y } : null;
-  };
 
   return (
     <svg className="absolute inset-0 pointer-events-none w-full h-full overflow-visible z-0">
@@ -16,11 +135,11 @@ export function ConnectionLayer() {
           id="arrowhead"
           markerWidth="10"
           markerHeight="7"
-          refX="9" // Slightly adjusted for path end
+          refX="9"
           refY="3.5"
           orient="auto"
         >
-          <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8" />
+          <polygon points="0 0, 10 3.5, 0 7" fill={CONNECTOR_COLOR} />
         </marker>
         <marker
           id="arrowhead-active"
@@ -30,83 +149,17 @@ export function ConnectionLayer() {
           refY="3.5"
           orient="auto"
         >
-          <polygon points="0 0, 10 3.5, 0 7" fill="#6366f1" />
+          <polygon points="0 0, 10 3.5, 0 7" fill={ACTIVE_COLOR} />
         </marker>
       </defs>
-      {connections.map((connection) => {
-        const sourcePos = getNodeData(connection.sourceId);
-        const targetPos = getNodeData(connection.targetId);
 
-        if (!sourcePos || !targetPos) return null;
+      {connections.map((conn) => (
+        <ConnectionPath key={conn.id} connection={conn} nodes={nodes} />
+      ))}
 
-        const { x: x1, y: y1 } = getHandleCoords(
-          connection.sourceId,
-          sourcePos,
-          connection.sourceHandle,
-        );
-        const { x: x2, y: y2 } = getHandleCoords(
-          connection.targetId,
-          targetPos,
-          connection.targetHandle,
-        );
-
-        // Calculate control points for Bezier curve
-        // Horizontal distance for curvature
-        const dist = Math.abs(x2 - x1);
-        const controlOffset = Math.max(dist * 0.5, 50);
-
-        const pathData = `M ${x1} ${y1} C ${x1 + controlOffset} ${y1}, ${
-          x2 - controlOffset
-        } ${y2}, ${x2} ${y2}`;
-
-        return (
-          <g key={connection.id}>
-            <path
-              d={pathData}
-              stroke="#94a3b8"
-              strokeWidth="2"
-              fill="none"
-              markerEnd="url(#arrowhead)"
-              style={{ opacity: 0.8 }}
-            />
-          </g>
-        );
-      })}
-
-      {/* Pending Connection Line */}
-      {ui.connectionPending &&
-        (() => {
-          const { sourceId, sourceHandle, mousePos } = ui.connectionPending;
-          const sourceNode = nodes.find((n) => n.id === sourceId);
-          if (!sourceNode) return null;
-
-          const { x: x1, y: y1 } = getHandleCoords(
-            sourceId,
-            { x: sourceNode.position.x, y: sourceNode.position.y },
-            sourceHandle,
-          );
-          // MousePos is in canvas coords (already transformed in FlowCanvas)
-          const x2 = mousePos.x;
-          const y2 = mousePos.y;
-
-          const dist = Math.abs(x2 - x1);
-          const controlOffset = Math.max(dist * 0.5, 50);
-
-          // Simple curvature to mouse
-          const pathData = `M ${x1} ${y1} C ${x1 + controlOffset} ${y1}, ${x2 - controlOffset} ${y2}, ${x2} ${y2}`;
-
-          return (
-            <path
-              d={pathData}
-              stroke="#6366f1"
-              strokeWidth="2"
-              strokeDasharray="5,5"
-              fill="none"
-              markerEnd="url(#arrowhead-active)"
-              className="animate-pulse"
-            />
-          );
-        })()}
+      {ui.connectionPending && (
+        <PendingConnectionPath pending={ui.connectionPending} nodes={nodes} />
+      )}
     </svg>
   );
 }
