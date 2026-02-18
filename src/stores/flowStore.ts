@@ -3,7 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import initialData from '../flow_data.json';
 
 export type NodeType = 'message' | 'choice';
-export type HandlePosition = 'top' | 'right' | 'bottom' | 'left';
+// export type HandlePosition = 'top' | 'right' | 'bottom' | 'left';
+export type HandlePosition = string;
 
 export interface NodeData {
   label: string;
@@ -36,6 +37,11 @@ interface FlowState {
   ui: {
     showPalette: boolean;
     showEditor: boolean;
+    connectionPending: {
+      sourceId: string;
+      sourceHandle: HandlePosition;
+      mousePos: { x: number; y: number };
+    } | null;
   };
   
   // Actions
@@ -53,6 +59,10 @@ interface FlowState {
   togglePalette: () => void;
   toggleEditor: () => void;
   setEditorOpen: (open: boolean) => void;
+  
+  startConnection: (sourceId: string, sourceHandle: HandlePosition, mousePos: { x: number; y: number }) => void;
+  updateConnectionMousePos: (mousePos: { x: number; y: number }) => void;
+  endConnection: () => void;
 }
 
 // ------------------------------------------------------------------
@@ -78,7 +88,7 @@ initialNodes.forEach(node => {
           id: uuidv4(),
           sourceId: node.id,
           targetId: opt.nextId,
-          sourceHandle: 'right', // Default flow direction
+          sourceHandle: opt.id, // Use Option ID as the handle ID for correct mapping
           targetHandle: 'left'
         });
       }
@@ -93,7 +103,8 @@ export const useFlowStore = create<FlowState>((set) => ({
   mode: 'editor',
   ui: {
     showPalette: true,
-    showEditor: true
+    showEditor: true,
+    connectionPending: null
   },
 
   setNodes: (nodes) => set({ nodes }),
@@ -132,13 +143,7 @@ export const useFlowStore = create<FlowState>((set) => ({
 
   selectNode: (id) => set((state) => ({ 
       selectedNodeId: id,
-      ui: { ...state.ui, showEditor: !!id || state.ui.showEditor } // Optional: auto-open if selecting, keep open if deselecting? Let's just update `selectedNodeId` and let user control visibility, OR auto-open on select. 
-      // User request: "provide ways to open and close". Auto-open on select is standard.
-      // If id is null (deselect), maybe don't auto-close? 
-      // Let's sticking to Manual control + Auto-open on NEW node.
-      // Actually, standard behavior: Select node -> Editor shows properties. Deselect -> Editor shows "Select node".
-      // But user wants to HIDE the panel.
-      // So let's leave visibility control explicit, except maybe for Add Node.
+      ui: { ...state.ui, showEditor: !!id || state.ui.showEditor }
   })),
 
   addConnection: (connection) => set((state) => ({
@@ -154,4 +159,19 @@ export const useFlowStore = create<FlowState>((set) => ({
   togglePalette: () => set((state) => ({ ui: { ...state.ui, showPalette: !state.ui.showPalette } })),
   toggleEditor: () => set((state) => ({ ui: { ...state.ui, showEditor: !state.ui.showEditor } })),
   setEditorOpen: (open) => set((state) => ({ ui: { ...state.ui, showEditor: open } })),
+
+  startConnection: (sourceId, sourceHandle, mousePos) => set((state) => ({
+    ui: { ...state.ui, connectionPending: { sourceId, sourceHandle, mousePos } }
+  })),
+
+  updateConnectionMousePos: (mousePos) => set((state) => ({
+    ui: { 
+      ...state.ui, 
+      connectionPending: state.ui.connectionPending ? { ...state.ui.connectionPending, mousePos } : null 
+    }
+  })),
+
+  endConnection: () => set((state) => ({
+    ui: { ...state.ui, connectionPending: null }
+  })),
 }));

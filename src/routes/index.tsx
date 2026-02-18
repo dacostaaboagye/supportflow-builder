@@ -7,7 +7,9 @@ import { useFlowStore } from "../stores/flowStore";
 import { createFileRoute } from "@tanstack/react-router";
 
 function App() {
-  const { mode } = useFlowStore();
+  const { mode, ui } = useFlowStore();
+  const showPalette = ui.showPalette;
+  const showEditor = ui.showEditor;
 
   return (
     <div className="w-full h-screen relative flex overflow-hidden">
@@ -15,9 +17,7 @@ function App() {
       <Toolbar />
 
       {/* Left Palette (Editor Mode Only) */}
-      {mode === "editor" && useFlowStore((s) => s.ui.showPalette) && (
-        <NodesPalette />
-      )}
+      {mode === "editor" && showPalette && <NodesPalette />}
 
       {/* Main Canvas Area */}
       <div className="flex-1 relative">
@@ -25,9 +25,7 @@ function App() {
       </div>
 
       {/* Editor Panel Overlay (only in editor mode) */}
-      {mode === "editor" && useFlowStore((s) => s.ui.showEditor) && (
-        <EditorPanel />
-      )}
+      {mode === "editor" && showEditor && <EditorPanel />}
 
       {/* Preview Overlay (only in preview mode) */}
       {mode === "preview" && <ChatPreview />}

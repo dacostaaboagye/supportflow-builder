@@ -57,7 +57,7 @@ export function ChatPreview() {
     // Current logic: Options drive navigation. If no options, it's a leaf node or dead end.
   };
 
-  const handleOptionClick = (optionLabel: string, nextId?: string) => {
+  const handleOptionClick = (optionLabel: string, optionId: string) => {
     // Add user message
     setHistory((prev) => [
       ...prev,
@@ -68,15 +68,25 @@ export function ChatPreview() {
       },
     ]);
 
-    if (nextId) {
-      const nextNode = nodes.find((n) => n.id === nextId);
+    // Find connection from this node + this option handle
+    const { connections } = useFlowStore.getState();
+    const connection = connections.find(
+      (c) => c.sourceId === currentNode?.id && c.sourceHandle === optionId,
+    );
+
+    // Also support legacy nextId if present (backward compatibility)
+    let nextNodeId = connection?.targetId;
+
+    // If we have connection, use it.
+    if (nextNodeId) {
+      const nextNode = nodes.find((n) => n.id === nextNodeId);
       if (nextNode) {
-        setTimeout(() => processNode(nextNode), 500); // Small delay for realism
+        setTimeout(() => processNode(nextNode), 500);
       } else {
-        // End of flow or broken link
         setCurrentNode(null);
       }
     } else {
+      // Legacy fallback? Or End.
       setCurrentNode(null);
     }
   };
@@ -140,7 +150,7 @@ export function ChatPreview() {
                     variant="secondary"
                     size="sm"
                     className="rounded-full animate-in fade-in duration-500"
-                    onClick={() => handleOptionClick(opt.label, opt.nextId)}
+                    onClick={() => handleOptionClick(opt.label, opt.id)}
                   >
                     {opt.label}
                   </Button>

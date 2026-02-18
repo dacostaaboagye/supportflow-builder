@@ -17,7 +17,13 @@ export function FlowCanvas() {
   // Track Space key for panning
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
+      const target = e.target as HTMLElement;
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
+
+      if (e.code === "Space" && !isInput) {
         e.preventDefault();
         setIsSpacePressed(true);
       }
@@ -88,21 +94,40 @@ export function FlowCanvas() {
     [isSpacePressed, selectNode],
   );
 
-  // Mouse move: pan
+  // Mouse move: pan or update connection line
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      // 1. Pan logic
       if (isPanning) {
         const dx = e.clientX - lastMousePos.current.x;
         const dy = e.clientY - lastMousePos.current.y;
         setTransform((prev) => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
         lastMousePos.current = { x: e.clientX, y: e.clientY };
       }
+
+      // 2. Connection Line Logic
+      const { ui, updateConnectionMousePos } = useFlowStore.getState();
+      if (ui.connectionPending && containerRef.current) {
+        // Convert screen to canvas coords
+        const rect = containerRef.current.getBoundingClientRect();
+        const x = (e.clientX - rect.left - transform.x) / transform.zoom;
+        const y = (e.clientY - rect.top - transform.y) / transform.zoom;
+        updateConnectionMousePos({ x, y });
+      }
     },
-    [isPanning],
+    [isPanning, transform],
   );
 
-  // Mouse up: stop panning
-  const handleMouseUp = useCallback(() => setIsPanning(false), []);
+  // Mouse up: stop panning OR connection
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+
+    // If we release mouse anywhere that is NOT a handle (handled by DraggableNode onMouseUp), cancel connection
+    const { ui, endConnection } = useFlowStore.getState();
+    if (ui.connectionPending) {
+      endConnection();
+    }
+  }, []);
 
   // Prevent browser zoom
   useEffect(() => {
