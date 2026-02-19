@@ -76,15 +76,22 @@ export function DraggableNode({ node, zoom }: Readonly<DraggableNodeProps>) {
 						: "border-border hover:border-primary/30 hover:shadow-md",
 				)}
 			>
-				<CardHeader className="p-3 pb-1.5">
-					<CardTitle className="text-[13px] font-semibold flex  justify-between gap-2">
+				<CardHeader
+					className={cn(
+						"p-3 pb-1.5 rounded-t-xl border-b",
+						node.type === "choice"
+							? "bg-accent-choice-bg border-accent-choice/20"
+							: "bg-accent-message-bg border-accent-message/20",
+					)}
+				>
+					<CardTitle className="text-[13px] font-semibold flex items-center justify-between gap-2 text-text-main">
 						<span className="truncate">{node.data.label}</span>
 						<span
 							className={cn(
-								"text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0",
+								"text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 border",
 								node.type === "choice"
-									? "bg-accent-choice-bg text-accent-choice"
-									: "bg-accent-message-bg text-accent-message",
+									? "bg-accent-choice-bg text-accent-choice border-accent-choice/30"
+									: "bg-accent-message-bg text-accent-message border-accent-message/30",
 							)}
 						>
 							{node.type === "choice" ? "Choice" : "Message"}
