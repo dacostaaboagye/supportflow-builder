@@ -20,6 +20,7 @@ export function getHandleCoords(
   if (domCoords) return domCoords;
 
   // 2. Fallback for standard positions using default dimensions
+  console.warn(`[getHandleCoords] DOM lookup failed for handle: nodeId=${nodeId}, handleId=${handleId}. Using fallback.`);
   return computeFallbackCoords(nodePosition, handleId);
 }
 
@@ -27,23 +28,23 @@ export function getHandleCoords(
 // Private helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Locate the handle element in the DOM and compute its canvas-space centre
- * point. Uses the ratio between unscaled and scaled element dimensions to
- * account for the canvas zoom level.
- */
 function measureHandleFromDOM(
   nodeId: string,
   nodePosition: Position,
   handleId: HandleId,
 ): Position | null {
+  // Try exact match first
   let handleEl = document.getElementById(`handle-${nodeId}-${handleId}`);
 
+  // For option handles (non-standard), try the right{handleId} pattern
   if (!handleEl && !STANDARD_POSITIONS.has(handleId)) {
     handleEl = document.getElementById(`handle-${nodeId}-right${handleId}`);
   }
 
-  if (!handleEl) return null;
+  if (!handleEl) {
+    console.warn(`[measureHandleFromDOM] Handle element not found: handle-${nodeId}-${handleId}`);
+    return null;
+  }
 
   const nodeEl = document.getElementById(nodeId);
   if (!nodeEl) return null;
@@ -60,10 +61,14 @@ function measureHandleFromDOM(
   const screenOffsetY = handleRect.top - nodeRect.top + handleRect.height / 2;
 
   // Convert to canvas-space and add to the node's stored position.
-  return {
+  const result = {
     x: nodePosition.x + screenOffsetX / scale,
     y: nodePosition.y + screenOffsetY / scale,
   };
+
+  console.log(`[measureHandleFromDOM] ${handleEl.id}: nodePos=(${nodePosition.x},${nodePosition.y}), screen offset=(${screenOffsetX.toFixed(1)},${screenOffsetY.toFixed(1)}), scale=${scale.toFixed(3)}, result=(${result.x.toFixed(1)},${result.y.toFixed(1)})`);
+
+  return result;
 }
 
 /**

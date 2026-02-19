@@ -93,14 +93,14 @@ function OptionsList({
       {options.map((opt) => (
         <div
           key={opt.id}
-          className="relative bg-surface-muted p-1.5 rounded border border-border flex items-center justify-between"
+          className="relative bg-surface-muted p-1.5 rounded border border-border flex items-center justify-between overflow-visible"
         >
-          <span>{opt.label}</span>
+          <span className="text-xs">{opt.label}</span>
           <NodeHandle
             nodeId={nodeId}
             type="source"
             position="right"
-            className="static translate-x-[18px]"
+            className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2"
             optionId={opt.id}
           />
         </div>
@@ -158,6 +158,12 @@ export function DraggableNode({ node, zoom }: Readonly<DraggableNodeProps>) {
     setIsDragging(true);
   };
 
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    selectNode(node.id);
+    useFlowStore.getState().setEditorOpen(true);
+  };
+
   useEffect(() => {
     if (!isDragging) return;
 
@@ -191,33 +197,39 @@ export function DraggableNode({ node, zoom }: Readonly<DraggableNodeProps>) {
         width: "280px",
       }}
       onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
       className={cn(
-        "cursor-grab active:cursor-grabbing group",
+        "cursor-grab active:cursor-grabbing group select-none",
         isSelected && "z-10",
       )}
     >
       <Card
         className={cn(
-          "border-2 transition-colors",
+          "rounded-xl border transition-all duration-200 overflow-visible",
           isSelected
-            ? "border-primary shadow-md"
-            : "border-transparent hover:border-primary/50",
+            ? "border-primary shadow-lg ring-2 ring-primary/20"
+            : "border-border hover:border-primary/30 hover:shadow-md",
         )}
       >
-        <CardHeader className="p-3 pb-2">
-          <CardTitle className="text-sm font-medium flex items-center justify-between">
-            {node.data.label}
-            {node.type === "choice" && (
-              <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                Choice
-              </span>
-            )}
+        <CardHeader className="p-3 pb-1.5">
+          <CardTitle className="text-[13px] font-semibold flex items-center justify-between gap-2">
+            <span className="truncate">{node.data.label}</span>
+            <span
+              className={cn(
+                "text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0",
+                node.type === "choice"
+                  ? "bg-accent-choice-bg text-accent-choice"
+                  : "bg-accent-message-bg text-accent-message",
+              )}
+            >
+              {node.type === "choice" ? "Choice" : "Message"}
+            </span>
           </CardTitle>
         </CardHeader>
 
-        <CardContent className="p-3 pt-0 text-xs text-text-muted">
-          <div className="mb-2 line-clamp-3">
-            {node.data.content || "Empty content..."}
+        <CardContent className="p-3 pt-0 text-xs text-text-muted leading-relaxed">
+          <div className="mb-1.5 line-clamp-2">
+            {node.data.content || "Double-click to edit..."}
           </div>
 
           {node.type === "choice" && node.data.options && (

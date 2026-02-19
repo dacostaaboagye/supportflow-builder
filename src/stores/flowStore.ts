@@ -68,7 +68,7 @@ const normaliseNodeType = (raw: string): NodeType =>
   raw === 'choice' ? 'choice' : 'message';
 
 const mapOption = (raw: RawNodeOption): NodeOption => ({
-  id: uuidv4(),
+  id: raw.id ?? uuidv4(),
   label: raw.label,
   nextId: raw.nextId,
 });
@@ -84,18 +84,32 @@ const initialNodes: FlowNode[] = flowData.nodes.map((n: RawNode) => ({
   },
 }));
 
-const initialConnections: FlowConnection[] = [];
-for (const node of initialNodes) {
-  if (!node.data.options) continue;
-  for (const opt of node.data.options) {
-    if (opt.nextId) {
-      initialConnections.push({
-        id: uuidv4(),
-        sourceId: node.id,
-        targetId: opt.nextId,
-        sourceHandle: opt.id,
-        targetHandle: 'left',
-      });
+// Load connections: prefer the explicit connections array from exported JSON,
+// fall back to building connections from legacy nextId fields on options.
+let initialConnections: FlowConnection[];
+
+if (flowData.connections && flowData.connections.length > 0) {
+  initialConnections = flowData.connections.map((c) => ({
+    id: c.id ?? uuidv4(),
+    sourceId: c.sourceId,
+    targetId: c.targetId,
+    sourceHandle: c.sourceHandle,
+    targetHandle: c.targetHandle,
+  }));
+} else {
+  initialConnections = [];
+  for (const node of initialNodes) {
+    if (!node.data.options) continue;
+    for (const opt of node.data.options) {
+      if (opt.nextId) {
+        initialConnections.push({
+          id: uuidv4(),
+          sourceId: node.id,
+          targetId: opt.nextId,
+          sourceHandle: opt.id,
+          targetHandle: 'left',
+        });
+      }
     }
   }
 }
@@ -110,8 +124,8 @@ export const useFlowStore = create<FlowState>((set) => ({
   selectedNodeId: null,
   mode: 'editor',
   ui: {
-    showPalette: true,
-    showEditor: true,
+    showPalette: false,
+    showEditor: false,
     connectionPending: null,
   },
 
@@ -160,10 +174,7 @@ export const useFlowStore = create<FlowState>((set) => ({
     })),
 
   selectNode: (id) =>
-    set((state) => ({
-      selectedNodeId: id,
-      ui: { ...state.ui, showEditor: !!id || state.ui.showEditor },
-    })),
+    set({ selectedNodeId: id }),
 
   addConnection: (connection) =>
     set((state) => ({

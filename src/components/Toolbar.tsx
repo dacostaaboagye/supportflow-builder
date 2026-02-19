@@ -1,6 +1,5 @@
 import { useFlowStore } from "../stores/flowStore";
-import { Button } from "./ui/button";
-import { Download, Upload } from "lucide-react";
+import { Download, Upload, Layout, SlidersHorizontal } from "lucide-react";
 import { useRef } from "react";
 import type { FlowNode, FlowConnection } from "../types";
 
@@ -24,7 +23,17 @@ export function Toolbar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
-    const data: ExportData = { nodes, connections };
+    // Put the root node first — the node with no incoming connections
+    const targetIds = new Set(connections.map((c) => c.targetId));
+    const sortedNodes = [...nodes].sort((a, b) => {
+      const aIsRoot = !targetIds.has(a.id);
+      const bIsRoot = !targetIds.has(b.id);
+      if (aIsRoot && !bIsRoot) return -1;
+      if (!aIsRoot && bIsRoot) return 1;
+      return 0;
+    });
+
+    const data: ExportData = { nodes: sortedNodes, connections };
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
@@ -54,45 +63,47 @@ export function Toolbar() {
   };
 
   return (
-    <div className="absolute top-4 left-4 flex gap-2 z-50">
-      <Button
-        variant={showPalette ? "primary" : "secondary"}
-        size="sm"
+    <div className="absolute top-4 left-4 flex gap-1.5 z-50">
+      <button
+        className={`w-9 h-9 flex items-center justify-center rounded-xl transition-smooth shadow-sm ${
+          showPalette
+            ? "bg-primary text-primary-foreground shadow-md"
+            : "glass-panel text-text-muted hover:text-text-main hover:shadow-md"
+        }`}
         onClick={() => useFlowStore.getState().togglePalette()}
         title="Toggle Nodes Palette"
       >
-        <span className="text-lg leading-none">+</span>
-      </Button>
+        <Layout className="w-4 h-4" />
+      </button>
 
-      <Button
-        variant={showEditor ? "primary" : "secondary"}
-        size="sm"
+      <button
+        className={`w-9 h-9 flex items-center justify-center rounded-xl transition-smooth shadow-sm ${
+          showEditor
+            ? "bg-primary text-primary-foreground shadow-md"
+            : "glass-panel text-text-muted hover:text-text-main hover:shadow-md"
+        }`}
         onClick={() => useFlowStore.getState().toggleEditor()}
         title="Toggle Inspector"
       >
-        <span className="text-lg leading-none">i</span>
-      </Button>
+        <SlidersHorizontal className="w-4 h-4" />
+      </button>
 
-      <div className="w-px h-8 bg-border mx-1" />
+      <div className="w-px h-9 bg-border/50 mx-0.5" />
 
-      <Button
-        variant="secondary"
-        size="sm"
+      <button
+        className="h-9 px-3 glass-panel rounded-xl text-xs font-medium text-text-muted hover:text-text-main hover:shadow-md transition-smooth shadow-sm flex items-center gap-1.5"
         onClick={handleExport}
-        className="gap-2"
       >
-        <Download className="w-4 h-4" /> Export
-      </Button>
+        <Download className="w-3.5 h-3.5" /> Export
+      </button>
 
       <div className="relative">
-        <Button
-          variant="secondary"
-          size="sm"
-          className="gap-2"
+        <button
+          className="h-9 px-3 glass-panel rounded-xl text-xs font-medium text-text-muted hover:text-text-main hover:shadow-md transition-smooth shadow-sm flex items-center gap-1.5"
           onClick={() => fileInputRef.current?.click()}
         >
-          <Upload className="w-4 h-4" /> Import
-        </Button>
+          <Upload className="w-3.5 h-3.5" /> Import
+        </button>
         <input
           type="file"
           ref={fileInputRef}

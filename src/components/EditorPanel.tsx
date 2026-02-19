@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { X } from "lucide-react";
+import { cn } from "../lib/utils";
 import type { NodeData } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -11,7 +12,7 @@ import type { NodeData } from "../types";
 
 function EmptyInspector({ onClose }: Readonly<{ onClose: () => void }>) {
   return (
-    <Card className="w-80 h-full border-l rounded-none border-border bg-surface shadow-none absolute right-0 top-0 pointer-events-auto flex flex-col">
+    <Card className="w-80 h-full border-l rounded-none border-border/50 bg-surface/95 backdrop-blur-sm shadow-none absolute right-0 top-0 pointer-events-auto flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between border-b p-4 h-14">
         <span className="text-sm font-semibold">Inspector</span>
         <Button
@@ -23,8 +24,8 @@ function EmptyInspector({ onClose }: Readonly<{ onClose: () => void }>) {
           <X className="w-4 h-4" />
         </Button>
       </CardHeader>
-      <CardContent className="pt-6 text-center text-text-muted">
-        <p>Select a node to edit</p>
+      <CardContent className="pt-6 text-center text-text-muted text-sm">
+        <p className="mt-8">Double-click a node to edit</p>
       </CardContent>
     </Card>
   );
@@ -75,9 +76,9 @@ export function EditorPanel() {
   // -- Render ---------------------------------------------------------------
 
   return (
-    <Card className="w-80 h-full border-l rounded-none border-border bg-surface shadow-xl absolute right-0 top-0 flex flex-col pointer-events-auto">
-      <CardHeader className="border-b border-border bg-surface-muted/30 flex flex-row items-center justify-between p-4 py-3">
-        <CardTitle className="text-lg">Node Inspector</CardTitle>
+    <Card className="w-80 h-full border-l rounded-none border-border/50 bg-surface/95 backdrop-blur-sm shadow-xl absolute right-0 top-0 flex flex-col pointer-events-auto">
+      <CardHeader className="border-b border-border/50 flex flex-row items-center justify-between p-4 py-3">
+        <CardTitle className="text-sm font-semibold">Inspector</CardTitle>
         <Button
           variant="ghost"
           size="sm"
@@ -91,7 +92,14 @@ export function EditorPanel() {
       <CardContent className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Node type badge */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono uppercase bg-primary/10 text-primary px-2 py-1 rounded">
+          <span
+            className={cn(
+              "text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-md",
+              selectedNode.type === "choice"
+                ? "bg-accent-choice-bg text-accent-choice"
+                : "bg-accent-message-bg text-accent-message",
+            )}
+          >
             {selectedNode.type}
           </span>
           <span className="text-xs text-text-muted font-mono truncate">
@@ -124,7 +132,7 @@ export function EditorPanel() {
           </label>
           <textarea
             id="node-content"
-            className="flex min-h-[80px] w-full rounded-md border border-border bg-surface px-3 py-2 text-sm placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex min-h-[80px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 transition-smooth"
             value={selectedNode.data.content}
             onChange={(e) => handleChange("content", e.target.value)}
           />

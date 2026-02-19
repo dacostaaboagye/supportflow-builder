@@ -1,58 +1,133 @@
 {
   "nodes": [
     {
-      "id": "node-1",
-      "type": "choice",
-      "data": { 
-        "label": "Start", 
-        "content": "Welcome to SupportFlow! How can we help you today?", 
-        "options": [
-          { "label": "Billing", "nextId": "node-2" }, 
-          { "label": "Tech Support", "nextId": "node-3" }
-        ] 
-      },
-      "position": { "x": 100, "y": 100 }
-    },
-    {
       "id": "node-2",
-      "type": "statement",
-      "data": { 
-        "label": "Billing Info", 
-        "content": "Please visit our billing portal at example.com/billing or call 555-0123." 
+      "type": "message",
+      "position": {
+        "x": 586,
+        "y": 96
       },
-      "position": { "x": 500, "y": 50 }
+      "data": {
+        "label": "Billing Info",
+        "content": "Please visit our billing portal at example.com/billing or call 555-0123."
+      }
     },
     {
-      "id": "node-3",
+      "id": "node-4",
+      "type": "message",
+      "position": {
+        "x": 882,
+        "y": 232
+      },
+      "data": {
+        "label": "Hardware",
+        "content": "Please restart your device. If the problem persists, bring it to a service center."
+      }
+    },
+    {
+      "id": "node-5",
+      "type": "message",
+      "position": {
+        "x": 875,
+        "y": 454
+      },
+      "data": {
+        "label": "Software",
+        "content": "Please ensure you have the latest update installed."
+      }
+    },
+    {
+      "id": "64c7de43-7787-405d-9b5d-98e1fcbdf9e0",
       "type": "choice",
-      "data": { 
-        "label": "Tech Support", 
-        "content": "Is your issue regarding hardware or software?", 
-        "options": [
-          { "label": "Hardware", "nextId": "node-4" }, 
-          { "label": "Software", "nextId": "node-5" }
-        ] 
+      "position": {
+        "x": 124,
+        "y": 134
       },
-      "position": { "x": 500, "y": 300 }
+      "data": {
+        "label": "Start",
+        "content": "Welcome to SupportFlow! How can we help you today?",
+        "options": [
+          {
+            "id": "52378ac4-35bd-4a78-8ce8-d5dfc551c214",
+            "label": "Billing"
+          },
+          {
+            "id": "b2b22a6a-ddcd-4e57-bbe0-9437716e0bb0",
+            "label": "Tech Support"
+          }
+        ]
+      }
     },
     {
-       "id": "node-4",
-       "type": "statement",
-       "data": { 
-         "label": "Hardware", 
-         "content": "Please restart your device. If the problem persists, bring it to a service center." 
-       },
-       "position": { "x": 900, "y": 200 }
+      "id": "1ec33741-a3bb-419e-b97c-77dc58e70c03",
+      "type": "choice",
+      "position": {
+        "x": 488,
+        "y": 295
+      },
+      "data": {
+        "label": "Tech Support",
+        "content": "Is your issue regarding hardware or software?",
+        "options": [
+          {
+            "id": "5f956a35-ada8-426e-b838-97fb923b7718",
+            "label": "Hardware"
+          },
+          {
+            "id": "7480900e-79c1-42ea-b71e-e9f874f35e64",
+            "label": "Software"
+          }
+        ]
+      }
     },
     {
-       "id": "node-5",
-       "type": "statement",
-       "data": { 
-         "label": "Software", 
-         "content": "Please ensure you have the latest update installed." 
-       },
-       "position": { "x": 900, "y": 400 }
+      "id": "22278633-cf5b-4d17-97ae-80d240dfd88c",
+      "type": "message",
+      "position": {
+        "x": 956.2727272727273,
+        "y": 95.00000000000009
+      },
+      "data": {
+        "label": "Contact",
+        "content": "You contact our hotline to speak to any of our agents"
+      }
     }
   ],
-  "rootId": "node-1"
+  "connections": [
+    {
+      "sourceId": "64c7de43-7787-405d-9b5d-98e1fcbdf9e0",
+      "targetId": "node-2",
+      "sourceHandle": "52378ac4-35bd-4a78-8ce8-d5dfc551c214",
+      "targetHandle": "left",
+      "id": "0bba3c3b-90a0-4dab-8f86-5ca6bd10eb0a"
+    },
+    {
+      "sourceId": "64c7de43-7787-405d-9b5d-98e1fcbdf9e0",
+      "targetId": "1ec33741-a3bb-419e-b97c-77dc58e70c03",
+      "sourceHandle": "b2b22a6a-ddcd-4e57-bbe0-9437716e0bb0",
+      "targetHandle": "left",
+      "id": "9a999c77-1e09-4425-b400-68c7f41fe9e4"
+    },
+    {
+      "sourceId": "1ec33741-a3bb-419e-b97c-77dc58e70c03",
+      "targetId": "node-4",
+      "sourceHandle": "5f956a35-ada8-426e-b838-97fb923b7718",
+      "targetHandle": "left",
+      "id": "0e14d411-efd2-46c0-8b84-be64600cd260"
+    },
+    {
+      "sourceId": "1ec33741-a3bb-419e-b97c-77dc58e70c03",
+      "targetId": "node-5",
+      "sourceHandle": "7480900e-79c1-42ea-b71e-e9f874f35e64",
+      "targetHandle": "left",
+      "id": "7656a2ee-2844-400e-acb4-67c5f4b8bab4"
+    },
+    {
+      "sourceId": "node-2",
+      "targetId": "22278633-cf5b-4d17-97ae-80d240dfd88c",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "id": "3bf23550-c5df-4936-8374-edea0345202f"
+    }
+  ]
 }

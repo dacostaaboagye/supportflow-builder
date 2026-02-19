@@ -85,6 +85,7 @@ export type AppMode = "editor" | "preview";
 // ---- Raw JSON shape (for parsing flow_data.json) --------------------------
 
 export interface RawNodeOption {
+  id?: string;
   label: string;
   nextId?: string;
 }
@@ -102,7 +103,16 @@ export interface RawNode {
   position?: Position;
 }
 
+export interface RawConnection {
+  id?: string;
+  sourceId: string;
+  targetId: string;
+  sourceHandle: string;
+  targetHandle: string;
+}
+
 export interface RawFlowData {
   nodes: RawNode[];
+  connections?: RawConnection[];
   rootId?: string;
 }

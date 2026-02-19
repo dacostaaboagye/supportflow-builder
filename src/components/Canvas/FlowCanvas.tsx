@@ -33,30 +33,30 @@ function CanvasControls({
   onRun,
 }: CanvasControlsProps) {
   return (
-    <div className="absolute bottom-4 left-4 bg-surface p-2 rounded-md shadow-md border border-border flex gap-2 items-center">
+    <div className="absolute bottom-4 left-4 glass-panel p-1.5 rounded-xl shadow-float flex gap-1 items-center">
       <button
-        className="px-2 py-1 hover:bg-surface-hover rounded text-text-main"
+        className="w-8 h-8 flex items-center justify-center hover:bg-surface-muted rounded-lg text-text-muted hover:text-text-main transition-smooth font-medium"
         onClick={onZoomOut}
       >
         −
       </button>
-      <span className="text-sm font-mono flex items-center min-w-[3ch] justify-center">
+      <span className="text-xs font-mono text-text-muted flex items-center min-w-[4ch] justify-center tabular-nums">
         {Math.round(zoom * 100)}%
       </span>
       <button
-        className="px-2 py-1 hover:bg-surface-hover rounded text-text-main"
+        className="w-8 h-8 flex items-center justify-center hover:bg-surface-muted rounded-lg text-text-muted hover:text-text-main transition-smooth font-medium"
         onClick={onZoomIn}
       >
         +
       </button>
 
-      <div className="w-px h-4 bg-border mx-1" />
+      <div className="w-px h-5 bg-border mx-0.5" />
 
       <button
-        className="px-3 py-1 bg-primary text-primary-foreground hover:bg-primary-hover rounded text-sm font-medium flex items-center gap-1 shadow-sm transition-colors"
+        className="px-3 h-8 bg-primary text-primary-foreground hover:bg-primary-hover rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-smooth"
         onClick={onRun}
       >
-        ▶ Run
+        <span className="text-[10px]">▶</span> Run
       </button>
     </div>
   );
@@ -278,7 +278,7 @@ export function FlowCanvas() {
     <div
       ref={containerRef}
       className={cn(
-        "w-full h-full overflow-hidden bg-canvas-bg relative cursor-default",
+        "w-full h-full overflow-hidden bg-canvas-bg canvas-dot-grid relative cursor-default",
         isSpacePressed && !isPanning && "cursor-grab",
         isPanning && "cursor-grabbing",
       )}
