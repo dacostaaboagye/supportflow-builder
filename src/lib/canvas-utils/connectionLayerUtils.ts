@@ -2,7 +2,7 @@ import type { Position } from "../../types";
 
 export const CONNECTOR_COLOR = "var(--color-connector)";
 export const ACTIVE_COLOR = "var(--color-primary)";
-export const DELETE_COLOR = "#ef4444";
+export const DELETE_COLOR = "var(--color-destructive)";
 
 export function buildBezierD(from: Position, to: Position): string {
 	const dist = Math.abs(to.x - from.x);
