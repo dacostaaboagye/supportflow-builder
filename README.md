@@ -89,3 +89,5 @@ Files:
 - Architecture and behavior: `docs/IMPLEMENTATION.md`
 - Component decomposition map: `docs/COMPONENT_MAP.md`
 - Design system tokens and semantics: `docs/DESIGN_SYSTEM.md`
+
+![Support flow](image.png)
