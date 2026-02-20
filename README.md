@@ -1,204 +1,93 @@
-Welcome to your new TanStack Start app! 
+# SupportFlow Visual Builder
 
-# Getting Started
+Visual decision-tree editor for SupportFlow AI. It replaces spreadsheet-driven chatbot configuration with a graph editor plus an instant chat runner.
 
-To run this application:
+## Stack
+- React + TypeScript
+- Zustand (state)
+- SVG (custom connector rendering)
+- Tailwind utility classes + custom design tokens
 
+## Run
 ```bash
 pnpm install
 pnpm dev
 ```
 
-# Building For Production
-
-To build this application for production:
-
+## Quality checks
 ```bash
-pnpm build
-```
-
-## Testing
-
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
-
-```bash
+pnpm exec tsc --noEmit
+pnpm check
 pnpm test
 ```
 
-## Styling
+Note: in this environment, `pnpm test` can fail with `spawn EPERM` (esbuild process restriction), not app type errors.
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+## Assignment compliance
 
-### Removing Tailwind CSS
+### Phase 1: Design System
+- Design tokens and visual language are documented in `docs/DESIGN_SYSTEM.md`.
+- Token source is `src/styles.css`.
+- Includes required categories:
+  - Canvas
+  - Node Cards
+  - Connectors
+  - Color Semantics
 
-If you prefer not to use Tailwind CSS:
+### Phase 2: Implementation constraints
+- No flowchart/graph library is used (`react-flow`, `jsPlumb`, `mermaid` are not used).
+- Node layout and connector geometry are implemented manually with DOM coordinates + SVG paths.
+- No Material UI / Bootstrap component library usage.
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Uninstall the packages: `pnpm add @tailwindcss/vite tailwindcss --dev`
+## User stories and acceptance criteria mapping
 
-## Linting & Formatting
+### Story 1: Visual Graph
+- AC1: Nodes render from JSON data source (`src/flow_data.json`) via store bootstrapping in `src/stores/flowStore.ts`.
+- AC2: Nodes use absolute positioning from `position.x/y` in `src/components/Canvas/DraggableNode.tsx`.
+- AC3: Parent-child lines are rendered in SVG using custom bezier logic in:
+  - `src/components/Canvas/ConnectionLayer.tsx`
+  - `src/components/Canvas/ConnectionPath.tsx`
+  - `src/components/Canvas/connectionLayerUtils.ts`
 
-This project uses [Biome](https://biomejs.dev/) for linting and formatting. The following scripts are available:
+### Story 2: Editor
+- AC1: Selecting/double-clicking a node opens inspector panel (`src/components/EditorPanel.tsx`).
+- AC2: Editing title/content/options updates live canvas state through Zustand actions (`updateNode`).
+- AC3: State is intentionally local/in-memory (`src/stores/flowStore.ts`), no backend dependency.
 
+### Story 3: Preview Mode
+- AC1: Run button toggles editor to preview (`setMode("preview")`) in `src/components/Canvas/FlowCanvas.tsx`.
+- AC2: Preview starts from inferred root node (first node with no incoming edge) in `src/components/Preview/chatPreviewUtils.ts`.
+- AC3: Selecting an option traverses graph using connection matching (`sourceId + sourceHandle`) in `src/components/Preview/ChatPreview.tsx`.
+- AC4: End-of-flow state shows restart CTA (`Restart Conversation`) in `src/components/Preview/ChatPreview.tsx`.
 
-```bash
-pnpm lint
-pnpm format
-pnpm check
-```
+## Wildcard feature (required)
 
+### Chosen feature: In-canvas connector management (selection + deletion)
+Why this matters for business:
+- Non-technical managers can quickly correct routing mistakes directly on the graph.
+- Reduces configuration time during policy changes and incident updates.
+- Prevents hidden spreadsheet-like edge errors by making routes explicit and editable.
 
+Implementation:
+- Click connector to select.
+- Delete via keyboard (`Delete` / `Backspace`) or inline delete control on highlighted edge.
+- Single-selection model across nodes/connectors for predictable editing.
 
-## Routing
+Files:
+- `src/components/Canvas/ConnectionLayer.tsx`
+- `src/components/Canvas/ConnectionPath.tsx`
+- `src/stores/flowStore.ts`
+- `src/types.ts`
 
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
+## Additional useful features implemented
+- Drag-and-drop node creation from palette.
+- Zoom + pan canvas controls.
+- JSON import/export for flow portability.
+- Conversation preview with typing simulation.
 
-### Adding A Route
+## Project docs
+- Architecture and behavior: `docs/IMPLEMENTATION.md`
+- Component decomposition map: `docs/COMPONENT_MAP.md`
+- Design system tokens and semantics: `docs/DESIGN_SYSTEM.md`
 
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+![Support flow](image.png)

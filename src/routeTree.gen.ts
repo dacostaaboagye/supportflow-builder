@@ -9,12 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as DemoDesignSystemRouteImport } from './routes/demo-design-system'
+import { Route as AnimationDemoRouteImport } from './routes/animation-demo'
 import { Route as IndexRouteImport } from './routes/index'
 
-const DemoDesignSystemRoute = DemoDesignSystemRouteImport.update({
-  id: '/demo-design-system',
-  path: '/demo-design-system',
+const AnimationDemoRoute = AnimationDemoRouteImport.update({
+  id: '/animation-demo',
+  path: '/animation-demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -25,37 +25,37 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/demo-design-system': typeof DemoDesignSystemRoute
+  '/animation-demo': typeof AnimationDemoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/demo-design-system': typeof DemoDesignSystemRoute
+  '/animation-demo': typeof AnimationDemoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/demo-design-system': typeof DemoDesignSystemRoute
+  '/animation-demo': typeof AnimationDemoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/demo-design-system'
+  fullPaths: '/' | '/animation-demo'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/demo-design-system'
-  id: '__root__' | '/' | '/demo-design-system'
+  to: '/' | '/animation-demo'
+  id: '__root__' | '/' | '/animation-demo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DemoDesignSystemRoute: typeof DemoDesignSystemRoute
+  AnimationDemoRoute: typeof AnimationDemoRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/demo-design-system': {
-      id: '/demo-design-system'
-      path: '/demo-design-system'
-      fullPath: '/demo-design-system'
-      preLoaderRoute: typeof DemoDesignSystemRouteImport
+    '/animation-demo': {
+      id: '/animation-demo'
+      path: '/animation-demo'
+      fullPath: '/animation-demo'
+      preLoaderRoute: typeof AnimationDemoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -70,7 +70,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DemoDesignSystemRoute: DemoDesignSystemRoute,
+  AnimationDemoRoute: AnimationDemoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

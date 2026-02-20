@@ -1,96 +1,112 @@
-import { useFlowStore } from "../stores/flowStore";
-import { Button } from "./ui/button";
-import { Download, Upload } from "lucide-react";
+import { Download, Layout, SlidersHorizontal, Upload } from "lucide-react";
 import { useRef } from "react";
+import { useFlowStore } from "../stores/flowStore";
+import type { FlowConnection, FlowNode } from "../types";
+
+interface ExportData {
+	nodes: FlowNode[];
+	connections: FlowConnection[];
+}
 
 export function Toolbar() {
-  const { nodes, connections, setNodes, addConnection } = useFlowStore();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+	const { nodes, connections, setNodes, setConnections } = useFlowStore();
+	const showPalette = useFlowStore((s) => s.ui.showPalette);
+	const showEditor = useFlowStore((s) => s.ui.showEditor);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExport = () => {
-    const data = {
-      nodes,
-      connections, // We also export connections to restore exact state
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "flow_data.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+	const handleExport = () => {
+		const targetIds = new Set(connections.map((c) => c.targetId));
+		const sortedNodes = [...nodes].sort((a, b) => {
+			const aIsRoot = !targetIds.has(a.id);
+			const bIsRoot = !targetIds.has(b.id);
+			if (aIsRoot && !bIsRoot) return -1;
+			if (!aIsRoot && bIsRoot) return 1;
+			return 0;
+		});
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+		const data: ExportData = { nodes: sortedNodes, connections };
+		const blob = new Blob([JSON.stringify(data, null, 2)], {
+			type: "application/json",
+		});
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = "flow_data.json";
+		a.click();
+		URL.revokeObjectURL(url);
+	};
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        if (json.nodes) {
-          setNodes(json.nodes);
-          // If import has manual connections, restore them.
-          // Our store derives connections from nextId usually, but if we save/load state, we might want to respect the saved connections if they are explicit.
-          // However, our data model in store separates them.
-          // If the exported JSON has nodes with "nextId" in options, the store initialization logic (if we re-ran it) would derive them.
-          // But `setNodes` just sets nodes.
-          // We need to also restore connections or re-derive them.
-          // For this feature, let's assume we export/import the FULL state.
+	const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
 
-          // Note: `flowStore` doesn't have `setConnections` public action exposed in the interface explicitly in previous step,
-          // let's check `flowStore.ts`.
-          // ... checked memory ... only `addConnection` / `deleteConnection`.
-          // I should probably add `setConnections` or just re-derive.
+		try {
+			const text = await file.text();
+			const json = JSON.parse(text) as ExportData;
+			if (json.nodes) {
+				setNodes(json.nodes);
+				if (json.connections) setConnections(json.connections);
+			}
+		} catch (err) {
+			console.error("Invalid JSON", err);
+			alert("Failed to parse JSON");
+		}
+	};
 
-          // Re-deriving is safer for consistency with "nextId".
-          // Actually, the `useFlowStore` initialization had logic to derive `initialConnections`.
-          // We can replicate that or just allow `setNodes` to trigger (if we had a subscriber, but we don't).
+	return (
+		<div className="absolute top-4 left-4 flex gap-1.5 z-50">
+			<button
+				type="button"
+				className={`w-9 h-9 flex items-center justify-center rounded-xl transition-smooth shadow-sm ${
+					showPalette
+						? "bg-primary text-primary-foreground shadow-md"
+						: "glass-panel text-text-muted hover:text-text-main hover:shadow-md"
+				}`}
+				onClick={() => useFlowStore.getState().togglePalette()}
+				title="Toggle Nodes Palette"
+			>
+				<Layout className="w-4 h-4" />
+			</button>
 
-          // Let's manually derive connections for now to be safe.
-          // Or better, just don't clear connections? No, we need to clear old ones.
+			<button
+				type="button"
+				className={`w-9 h-9 flex items-center justify-center rounded-xl transition-smooth shadow-sm ${
+					showEditor
+						? "bg-primary text-primary-foreground shadow-md"
+						: "glass-panel text-text-muted hover:text-text-main hover:shadow-md"
+				}`}
+				onClick={() => useFlowStore.getState().toggleEditor()}
+				title="Toggle Inspector"
+			>
+				<SlidersHorizontal className="w-4 h-4" />
+			</button>
 
-          // Simplest approach: Reload page? No, that's bad UX.
-          // Let's just update `nodes` and then loop to add connections.
-        }
-      } catch (err) {
-        console.error("Invalid JSON", err);
-        alert("Failed to parse JSON");
-      }
-    };
-    reader.readAsText(file);
-  };
+			<div className="w-px h-9 bg-border/50 mx-0.5" />
 
-  return (
-    <div className="absolute top-4 left-4 flex gap-2 z-50">
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={handleExport}
-        className="gap-2"
-      >
-        <Download className="w-4 h-4" /> Export
-      </Button>
-      <div className="relative">
-        <Button
-          variant="secondary"
-          size="sm"
-          className="gap-2"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload className="w-4 h-4" /> Import
-        </Button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleImport}
-          className="hidden"
-          accept=".json"
-        />
-      </div>
-    </div>
-  );
+			<button
+				type="button"
+				className="h-9 px-3 glass-panel rounded-xl text-xs font-medium text-text-muted hover:text-text-main hover:shadow-md transition-smooth shadow-sm flex items-center gap-1.5"
+				onClick={handleExport}
+			>
+				<Download className="w-3.5 h-3.5" /> Export
+			</button>
+
+			<div className="relative">
+				<button
+					type="button"
+					className="h-9 px-3 glass-panel rounded-xl text-xs font-medium text-text-muted hover:text-text-main hover:shadow-md transition-smooth shadow-sm flex items-center gap-1.5"
+					onClick={() => fileInputRef.current?.click()}
+				>
+					<Upload className="w-3.5 h-3.5" /> Import
+				</button>
+				<input
+					type="file"
+					ref={fileInputRef}
+					onChange={handleImport}
+					className="hidden"
+					accept=".json"
+				/>
+			</div>
+		</div>
+	);
 }

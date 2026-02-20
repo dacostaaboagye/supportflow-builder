@@ -1,140 +1,252 @@
-import React, { useRef, useState, useCallback, useEffect } from "react";
-import { useFlowStore } from "../../stores/flowStore";
-import { DraggableNode } from "./DraggableNode";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { CanvasTransform } from "@/lib/canvas-utils/flowCanvasTypes";
+import {
+	isTextInput,
+	MAX_ZOOM,
+	MIN_ZOOM,
+	screenToCanvas,
+	ZOOM_SENSITIVITY,
+	ZOOM_STEP,
+} from "@/lib/canvas-utils/flowCanvasUtils";
+import { cn } from "@/lib/utils";
+import { useFlowStore } from "@/stores/flowStore";
+import type { NodeType, Position } from "@/types";
+import { CanvasControls } from "./CanvasControls";
 import { ConnectionLayer } from "./ConnectionLayer";
-import { cn } from "../../lib/utils";
+import { DraggableNode } from "./DraggableNode";
 
 export function FlowCanvas() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [transform, setTransform] = useState({ x: 0, y: 0, zoom: 1 });
-  const [isPanning, setIsPanning] = useState(false);
-  const lastMousePos = useRef({ x: 0, y: 0 });
+	const containerRef = useRef<HTMLDivElement>(null);
+	const contentRef = useRef<HTMLDivElement>(null);
+	const lastMousePos = useRef<Position>({ x: 0, y: 0 });
 
-  const { nodes, selectNode } = useFlowStore();
+	const [transform, setTransform] = useState<CanvasTransform>({
+		x: 0,
+		y: 0,
+		zoom: 1,
+	});
+	const [isPanning, setIsPanning] = useState(false);
+	const [isSpacePressed, setIsSpacePressed] = useState(false);
 
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      // Zoom logic
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const zoomSensitivity = 0.001;
-        const newZoom = Math.min(
-          Math.max(transform.zoom - e.deltaY * zoomSensitivity, 0.1),
-          5,
-        );
-        setTransform((prev) => ({ ...prev, zoom: newZoom }));
-      } else {
-        // Pan logic if no modifier
-        setTransform((prev) => ({
-          ...prev,
-          x: prev.x - e.deltaX,
-          y: prev.y - e.deltaY,
-        }));
-      }
-    },
-    [transform.zoom],
-  );
+	const {
+		nodes,
+		selectedNodeId,
+		selectNode,
+		setSelectedConnection,
+		deleteNode,
+	} = useFlowStore();
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // Middle mouse or Space+LeftClick to pan
-    if (
-      e.button === 1 ||
-      (e.button === 0 && e.nativeEvent.getModifierState("Space"))
-    ) {
-      setIsPanning(true);
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-      e.preventDefault();
-    } else if (e.target === containerRef.current) {
-      // Deselect if clicking on empty canvas
-      selectNode(null);
-    }
-  };
+	useEffect(() => {
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (
+				(e.ctrlKey || e.metaKey) &&
+				e.key.toLowerCase() === "d" &&
+				!isTextInput(e.target) &&
+				selectedNodeId
+			) {
+				e.preventDefault();
+				useFlowStore.getState().duplicateNode(selectedNodeId);
+				return;
+			}
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning) {
-      const dx = e.clientX - lastMousePos.current.x;
-      const dy = e.clientY - lastMousePos.current.y;
-      setTransform((prev) => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-    }
-  };
+			if (
+				(e.key === "Delete" || e.key === "Backspace") &&
+				!isTextInput(e.target) &&
+				selectedNodeId
+			) {
+				e.preventDefault();
+				deleteNode(selectedNodeId);
+				return;
+			}
 
-  const handleMouseUp = () => {
-    setIsPanning(false);
-  };
+			if (e.code === "Space" && !isTextInput(e.target)) {
+				e.preventDefault();
+				setIsSpacePressed(true);
+			}
+		};
+		const onKeyUp = (e: KeyboardEvent) => {
+			if (e.code === "Space") setIsSpacePressed(false);
+		};
 
-  // Prevent default browser zoom behavior
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+		globalThis.addEventListener("keydown", onKeyDown);
+		globalThis.addEventListener("keyup", onKeyUp);
+		return () => {
+			globalThis.removeEventListener("keydown", onKeyDown);
+			globalThis.removeEventListener("keyup", onKeyUp);
+		};
+	}, [selectedNodeId, deleteNode]);
 
-    const preventDefault = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) e.preventDefault();
-    };
+	const handleWheel = useCallback((e: React.WheelEvent) => {
+		const { clientX, clientY, deltaX, deltaY, ctrlKey, metaKey } = e;
 
-    container.addEventListener("wheel", preventDefault, { passive: false });
-    return () => container.removeEventListener("wheel", preventDefault);
-  }, []);
+		if (ctrlKey || metaKey) {
+			e.preventDefault();
+			setTransform((prev) => {
+				const newZoom = Math.min(
+					Math.max(prev.zoom - deltaY * ZOOM_SENSITIVITY, MIN_ZOOM),
+					MAX_ZOOM,
+				);
+				if (!containerRef.current) return { ...prev, zoom: newZoom };
 
-  return (
-    <div
-      ref={containerRef}
-      className={cn(
-        "w-full h-full overflow-hidden bg-canvas-bg relative cursor-default",
-        isPanning && "cursor-grabbing",
-      )}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onWheel={handleWheel}
-    >
-      {/* Transform Container */}
-      <div
-        style={{
-          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`,
-          transformOrigin: "0 0",
-          width: "100%",
-          height: "100%",
-          position: "absolute",
-          top: 0,
-          left: 0,
-        }}
-      >
-        <ConnectionLayer />
+				const rect = containerRef.current.getBoundingClientRect();
+				const offsetX = clientX - rect.left;
+				const offsetY = clientY - rect.top;
+				return {
+					x: offsetX - (offsetX - prev.x) * (newZoom / prev.zoom),
+					y: offsetY - (offsetY - prev.y) * (newZoom / prev.zoom),
+					zoom: newZoom,
+				};
+			});
+		} else {
+			setTransform((prev) => ({
+				...prev,
+				x: prev.x - deltaX,
+				y: prev.y - deltaY,
+			}));
+		}
+	}, []);
 
-        {nodes.map((node) => (
-          <DraggableNode key={node.id} node={node} zoom={transform.zoom} />
-        ))}
-      </div>
+	const handleMouseDown = useCallback(
+		(e: React.MouseEvent) => {
+			const shouldPan = e.button === 1 || (e.button === 0 && isSpacePressed);
 
-      {/* Controls Overlay */}
-      <div className="absolute bottom-4 left-4 bg-surface p-2 rounded-md shadow-md border border-border flex gap-2 items-center">
-        <button
-          className="px-2 py-1 hover:bg-surface-hover rounded text-text-main"
-          onClick={() => setTransform((t) => ({ ...t, zoom: t.zoom - 0.1 }))}
-        >
-          -
-        </button>
-        <span className="text-sm font-mono flex items-center min-w-[3ch] justify-center">
-          {Math.round(transform.zoom * 100)}%
-        </span>
-        <button
-          className="px-2 py-1 hover:bg-surface-hover rounded text-text-main"
-          onClick={() => setTransform((t) => ({ ...t, zoom: t.zoom + 0.1 }))}
-        >
-          +
-        </button>
+			if (shouldPan) {
+				e.preventDefault();
+				setIsPanning(true);
+				lastMousePos.current = { x: e.clientX, y: e.clientY };
+			} else if (
+				e.target === containerRef.current ||
+				e.target === contentRef.current
+			) {
+				selectNode(null);
+				setSelectedConnection(null);
+			}
+		},
+		[isSpacePressed, selectNode, setSelectedConnection],
+	);
 
-        <div className="w-px h-4 bg-border mx-1" />
+	const handleMouseMove = useCallback(
+		(e: React.MouseEvent) => {
+			if (isPanning) {
+				const dx = e.clientX - lastMousePos.current.x;
+				const dy = e.clientY - lastMousePos.current.y;
+				setTransform((prev) => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+				lastMousePos.current = { x: e.clientX, y: e.clientY };
+			}
 
-        <button
-          className="px-3 py-1 bg-primary text-primary-foreground hover:bg-primary-hover rounded text-sm font-medium flex items-center gap-1 shadow-sm transition-colors"
-          onClick={() => useFlowStore.getState().setMode("preview")}
-        >
-          ▶ Run
-        </button>
-      </div>
-    </div>
-  );
+			const { ui, updateConnectionMousePos } = useFlowStore.getState();
+			if (ui.connectionPending && containerRef.current) {
+				const rect = containerRef.current.getBoundingClientRect();
+				updateConnectionMousePos(
+					screenToCanvas(e.clientX, e.clientY, rect, transform),
+				);
+			}
+		},
+		[isPanning, transform],
+	);
+
+	const handleMouseUp = useCallback(() => {
+		setIsPanning(false);
+		const { ui, endConnection } = useFlowStore.getState();
+		if (ui.connectionPending) endConnection();
+	}, []);
+
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+
+		const prevent = (e: WheelEvent) => {
+			if (e.ctrlKey || e.metaKey) e.preventDefault();
+		};
+		container.addEventListener("wheel", prevent, { passive: false });
+		return () => container.removeEventListener("wheel", prevent);
+	}, []);
+
+	const onDragOver = useCallback((e: React.DragEvent) => {
+		e.preventDefault();
+		e.dataTransfer.dropEffect = "move";
+	}, []);
+
+	const onDrop = useCallback(
+		(e: React.DragEvent) => {
+			e.preventDefault();
+			const type = e.dataTransfer.getData("application/reactflow") as
+				| NodeType
+				| "";
+			if (!type) return;
+
+			if (containerRef.current) {
+				const rect = containerRef.current.getBoundingClientRect();
+				const position = screenToCanvas(e.clientX, e.clientY, rect, transform);
+				useFlowStore.getState().addNode(type as NodeType, position);
+			}
+		},
+		[transform],
+	);
+
+	const handleZoomIn = useCallback(
+		() =>
+			setTransform((t) => ({
+				...t,
+				zoom: Math.min(t.zoom + ZOOM_STEP, MAX_ZOOM),
+			})),
+		[],
+	);
+	const handleZoomOut = useCallback(
+		() =>
+			setTransform((t) => ({
+				...t,
+				zoom: Math.max(t.zoom - ZOOM_STEP, MIN_ZOOM),
+			})),
+		[],
+	);
+	const handleRun = useCallback(
+		() => useFlowStore.getState().setMode("preview"),
+		[],
+	);
+
+	return (
+		<div
+			ref={containerRef}
+			role="application"
+			className={cn(
+				"w-full h-full overflow-hidden bg-canvas-bg canvas-dot-grid relative cursor-default",
+				isSpacePressed && !isPanning && "cursor-grab",
+				isPanning && "cursor-grabbing",
+			)}
+			onMouseDown={handleMouseDown}
+			onMouseMove={handleMouseMove}
+			onMouseUp={handleMouseUp}
+			onMouseLeave={handleMouseUp}
+			onWheel={handleWheel}
+			onDragOver={onDragOver}
+			onDrop={onDrop}
+		>
+			<div
+				ref={contentRef}
+				style={{
+					transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`,
+					transformOrigin: "0 0",
+					width: "100%",
+					height: "100%",
+					position: "absolute",
+					top: 0,
+					left: 0,
+				}}
+			>
+				<ConnectionLayer />
+				{nodes.map((node) => (
+					<DraggableNode key={node.id} node={node} zoom={transform.zoom} />
+				))}
+			</div>
+
+			<CanvasControls
+				zoom={transform.zoom}
+				onZoomIn={handleZoomIn}
+				onZoomOut={handleZoomOut}
+				onRun={handleRun}
+			/>
+		</div>
+	);
 }

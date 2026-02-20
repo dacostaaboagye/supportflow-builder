@@ -1,59 +1,124 @@
-import { useFlowStore, type Node } from "../../stores/flowStore";
-
-// Helper to get handle coordinates
-const getHandleCoords = (nodeId: string, handlePos: string, nodes: Node[]) => {
-  const node = nodes.find((n) => n.id === nodeId);
-  if (!node) return { x: 0, y: 0 };
-
-  // Assuming fixed size for now or we need to track node dimensions in store
-  const w = 280;
-  const h = 100; // rough estimate, ideally dynamic
-  const x = node.position.x;
-  const y = node.position.y;
-
-  switch (handlePos) {
-    case "top":
-      return { x: x + w / 2, y };
-    case "right":
-      return { x: x + w, y: y + h / 2 };
-    case "bottom":
-      return { x: x + w / 2, y: y + h };
-    case "left":
-      return { x, y: y + h / 2 };
-    default:
-      return { x, y };
-  }
-};
+import { useCallback, useEffect, useId, useState } from "react";
+import { useFlowStore } from "../../stores/flowStore";
+import { ConnectionPath } from "./ConnectionPath";
+import {
+  ACTIVE_COLOR,
+  CONNECTOR_COLOR,
+} from "../../lib/canvas-utils/connectionLayerUtils";
+import { PendingConnectionPath } from "./PendingConnectionPath";
 
 export function ConnectionLayer() {
-  const { connections, nodes } = useFlowStore();
+  const { connections, nodes, ui, deleteConnection, setSelectedConnection } =
+    useFlowStore();
+  const [ready, setReady] = useState(false);
+  const markerPrefix = useId();
+  const markerId = `${markerPrefix}-arrowhead`;
+  const markerActiveId = `${markerPrefix}-arrowhead-active`;
+  const { selectedConnectionId } = ui;
+
+  useEffect(() => {
+    let cancelled = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) setReady(true);
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedConnectionId) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        deleteConnection(selectedConnectionId);
+        setSelectedConnection(null);
+      }
+      if (e.key === "Escape") {
+        setSelectedConnection(null);
+      }
+    };
+
+    globalThis.addEventListener("keydown", onKeyDown);
+    return () => globalThis.removeEventListener("keydown", onKeyDown);
+  }, [selectedConnectionId, deleteConnection, setSelectedConnection]);
+
+  const handleSelect = useCallback(
+    (id: string) => {
+      setSelectedConnection(selectedConnectionId === id ? null : id);
+    },
+    [selectedConnectionId, setSelectedConnection],
+  );
+
+  const handleDelete = useCallback(
+    (id: string) => {
+      deleteConnection(id);
+      setSelectedConnection(null);
+    },
+    [deleteConnection, setSelectedConnection],
+  );
+
+  const handleSvgPointerDown = useCallback(() => {
+    setSelectedConnection(null);
+  }, [setSelectedConnection]);
 
   return (
-    <svg className="absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none">
-      {connections.map((conn) => {
-        const start = getHandleCoords(conn.sourceId, conn.sourceHandle, nodes);
-        const end = getHandleCoords(conn.targetId, conn.targetHandle, nodes);
+    <svg
+      className="absolute inset-0 pointer-events-none w-full h-full overflow-visible z-0"
+      onPointerDown={handleSvgPointerDown}
+    >
+      <title>Connection layer</title>
+      <defs>
+        <marker
+          id={markerId}
+          viewBox="0 0 8 6"
+          markerWidth="8"
+          markerHeight="6"
+          refX="8"
+          refY="3"
+          orient="auto"
+          markerUnits="strokeWidth"
+        >
+          <path d="M 0 0 L 8 3 L 0 6 L 2 3 Z" fill={CONNECTOR_COLOR} />
+        </marker>
+        <marker
+          id={markerActiveId}
+          viewBox="0 0 8 6"
+          markerWidth="8"
+          markerHeight="6"
+          refX="8"
+          refY="3"
+          orient="auto"
+          markerUnits="strokeWidth"
+        >
+          <path d="M 0 0 L 8 3 L 0 6 L 2 3 Z" fill={ACTIVE_COLOR} />
+        </marker>
+      </defs>
 
-        // Simple Bezier Logic
-        // For right -> left
-        const dist = Math.abs(end.x - start.x) * 0.5;
-        const cp1 = { x: start.x + dist, y: start.y };
-        const cp2 = { x: end.x - dist, y: end.y };
+      {ready &&
+        connections.map((connection) => (
+          <ConnectionPath
+            key={connection.id}
+            connection={connection}
+            nodes={nodes}
+            isSelected={selectedConnectionId === connection.id}
+            defaultMarkerId={markerId}
+            activeMarkerId={markerActiveId}
+            onSelect={handleSelect}
+            onDelete={handleDelete}
+          />
+        ))}
 
-        // Adjust for vertical if needed, but keeping it simple horizontal flow for now
-        const pathData = `M ${start.x} ${start.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${end.x} ${end.y}`;
-
-        return (
-          <g key={conn.id}>
-            <path
-              d={pathData}
-              stroke="var(--color-connector)"
-              strokeWidth="2"
-              fill="none"
-            />
-          </g>
-        );
-      })}
+      {ready && ui.connectionPending && (
+        <PendingConnectionPath
+          pending={ui.connectionPending}
+          nodes={nodes}
+          activeMarkerId={markerActiveId}
+        />
+      )}
     </svg>
   );
 }
