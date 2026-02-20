@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Copy, X } from "lucide-react";
 import { useFlowStore } from "../stores/flowStore";
 import type { NodeData } from "../types";
 import { ChoiceOptionsEditor } from "./EditorPanel/ChoiceOptionsEditor";
@@ -9,8 +9,14 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 export function EditorPanel() {
-	const { selectedNodeId, nodes, updateNode, deleteNode, setEditorOpen } =
-		useFlowStore();
+	const {
+		selectedNodeId,
+		nodes,
+		updateNode,
+		deleteNode,
+		duplicateNode,
+		setEditorOpen,
+	} = useFlowStore();
 	const selectedNode = nodes.find((node) => node.id === selectedNodeId);
 
 	if (!selectedNode) {
@@ -77,7 +83,15 @@ export function EditorPanel() {
 				)}
 			</CardContent>
 
-			<div className="p-4 border-t border-border">
+			<div className="p-4 border-t border-border space-y-2">
+				<Button
+					variant="secondary"
+					className="w-full"
+					onClick={() => duplicateNode(selectedNode.id)}
+				>
+					<Copy className="w-4 h-4 mr-2" />
+					Duplicate Node
+				</Button>
 				<Button
 					variant="destructive"
 					className="w-full"

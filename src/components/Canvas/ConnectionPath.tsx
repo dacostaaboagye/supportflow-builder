@@ -8,6 +8,7 @@ import {
   CONNECTOR_COLOR,
   DELETE_COLOR,
 } from "../../lib/canvas-utils/connectionLayerUtils";
+import { X } from "lucide-react";
 
 interface ConnectionPathProps {
   connection: FlowConnection;
@@ -38,6 +39,7 @@ export function ConnectionPath({
     source.position,
     connection.sourceHandle,
   );
+  
   const to = getHandleCoords(
     connection.targetId,
     target.position,
@@ -50,7 +52,6 @@ export function ConnectionPath({
 
   return (
     <g>
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: SVG edges need hover tracking for highlight state. */}
       <path
         d={d}
         onMouseEnter={() => setIsHovered(true)}
@@ -97,7 +98,7 @@ export function ConnectionPath({
               onDelete(connection.id);
             }}
           >
-            x
+            <X/>
           </button>
         </foreignObject>
       )}

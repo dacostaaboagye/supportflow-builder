@@ -1,237 +1,278 @@
 import { v4 as uuidv4 } from "uuid";
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 import rawData from "../flow_data.json";
 import type {
-	AppMode,
-	FlowConnection,
-	FlowNode,
-	HandleId,
-	NodeData,
-	NodeOption,
-	NodeType,
-	Position,
-	RawFlowData,
-	RawNode,
-	RawNodeOption,
-	UIState,
+  AppMode,
+  FlowConnection,
+  FlowNode,
+  HandleId,
+  NodeData,
+  NodeOption,
+  NodeType,
+  Position,
+  RawFlowData,
+  RawNode,
+  RawNodeOption,
+  UIState,
 } from "../types";
 
 export type {
-	FlowConnection as Connection,
-	FlowNode as Node,
-	HandleId as HandlePosition,
-	NodeData,
-	NodeType,
+  FlowConnection as Connection,
+  FlowNode as Node,
+  HandleId as HandlePosition,
+  NodeData,
+  NodeType,
 } from "../types";
 
 interface FlowState {
-	nodes: FlowNode[];
-	connections: FlowConnection[];
-	selectedNodeId: string | null;
-	mode: AppMode;
-	ui: UIState;
+  nodes: FlowNode[];
+  connections: FlowConnection[];
+  selectedNodeId: string | null;
+  mode: AppMode;
+  ui: UIState;
 
-	setNodes: (nodes: FlowNode[]) => void;
-	addNode: (type: NodeType, position: Position) => void;
-	updateNode: (id: string, data: Partial<NodeData>) => void;
-	moveNode: (id: string, position: Position) => void;
-	deleteNode: (id: string) => void;
-	selectNode: (id: string | null) => void;
+  setNodes: (nodes: FlowNode[]) => void;
+  addNode: (type: NodeType, position: Position) => void;
+  updateNode: (id: string, data: Partial<NodeData>) => void;
+  moveNode: (id: string, position: Position) => void;
+  deleteNode: (id: string) => void;
+  duplicateNode: (id: string) => void;
+  selectNode: (id: string | null) => void;
 
-	addConnection: (connection: Omit<FlowConnection, "id">) => void;
-	deleteConnection: (id: string) => void;
-	setConnections: (connections: FlowConnection[]) => void;
+  addConnection: (connection: Omit<FlowConnection, "id">) => void;
+  deleteConnection: (id: string) => void;
+  setConnections: (connections: FlowConnection[]) => void;
 
-	setMode: (mode: AppMode) => void;
-	togglePalette: () => void;
-	toggleEditor: () => void;
-	setEditorOpen: (open: boolean) => void;
-	setSelectedConnection: (id: string | null) => void;
+  setMode: (mode: AppMode) => void;
+  togglePalette: () => void;
+  toggleEditor: () => void;
+  setEditorOpen: (open: boolean) => void;
+  setSelectedConnection: (id: string | null) => void;
 
-	startConnection: (
-		sourceId: string,
-		sourceHandle: HandleId,
-		mousePos: Position,
-	) => void;
-	updateConnectionMousePos: (mousePos: Position) => void;
-	endConnection: () => void;
+  startConnection: (
+    sourceId: string,
+    sourceHandle: HandleId,
+    mousePos: Position,
+  ) => void;
+  updateConnectionMousePos: (mousePos: Position) => void;
+  endConnection: () => void;
 }
 
 const flowData = rawData as RawFlowData;
 
 const normaliseNodeType = (raw: string): NodeType =>
-	raw === "choice" ? "choice" : "message";
+  raw === "choice" ? "choice" : "message";
 
 const mapOption = (raw: RawNodeOption): NodeOption => ({
-	id: raw.id ?? uuidv4(),
-	label: raw.label,
-	nextId: raw.nextId,
+  id: raw.id ?? uuidv4(),
+  label: raw.label,
+  nextId: raw.nextId,
 });
 
 const initialNodes: FlowNode[] = flowData.nodes.map((node: RawNode) => ({
-	id: node.id,
-	type: normaliseNodeType(node.type),
-	position: node.position ?? { x: 0, y: 0 },
-	data: {
-		label: node.data.label,
-		content: node.data.content,
-		options: node.data.options ? node.data.options.map(mapOption) : undefined,
-	},
+  id: node.id,
+  type: normaliseNodeType(node.type),
+  position: node.position ?? { x: 0, y: 0 },
+  data: {
+    label: node.data.label,
+    content: node.data.content,
+    options: node.data.options ? node.data.options.map(mapOption) : undefined,
+  },
 }));
 
 function buildInitialConnections(nodes: FlowNode[]): FlowConnection[] {
-	if (flowData.connections && flowData.connections.length > 0) {
-		return flowData.connections.map((connection) => ({
-			id: connection.id ?? uuidv4(),
-			sourceId: connection.sourceId,
-			targetId: connection.targetId,
-			sourceHandle: connection.sourceHandle,
-			targetHandle: connection.targetHandle,
-		}));
-	}
+  if (flowData.connections && flowData.connections.length > 0) {
+    return flowData.connections.map((connection) => ({
+      id: connection.id ?? uuidv4(),
+      sourceId: connection.sourceId,
+      targetId: connection.targetId,
+      sourceHandle: connection.sourceHandle,
+      targetHandle: connection.targetHandle,
+    }));
+  }
 
-	const derivedConnections: FlowConnection[] = [];
-	for (const node of nodes) {
-		if (!node.data.options) continue;
-		for (const option of node.data.options) {
-			if (!option.nextId) continue;
-			derivedConnections.push({
-				id: uuidv4(),
-				sourceId: node.id,
-				targetId: option.nextId,
-				sourceHandle: option.id,
-				targetHandle: "left",
-			});
-		}
-	}
-	return derivedConnections;
+  const derivedConnections: FlowConnection[] = [];
+  for (const node of nodes) {
+    if (!node.data.options) continue;
+    for (const option of node.data.options) {
+      if (!option.nextId) continue;
+      derivedConnections.push({
+        id: uuidv4(),
+        sourceId: node.id,
+        targetId: option.nextId,
+        sourceHandle: option.id,
+        targetHandle: "left",
+      });
+    }
+  }
+  return derivedConnections;
 }
 
 const initialConnections = buildInitialConnections(initialNodes);
 
-export const useFlowStore = create<FlowState>((set) => ({
-	nodes: initialNodes,
-	connections: initialConnections,
-	selectedNodeId: null,
-	mode: "editor",
-	ui: {
-		showPalette: false,
-		showEditor: false,
-		connectionPending: null,
-		selectedConnectionId: null,
-	},
+export const useFlowStore = create<FlowState>()(
+  persist(
+    (set) => ({
+      nodes: initialNodes,
+      connections: initialConnections,
+      selectedNodeId: null,
+      mode: "editor",
+      ui: {
+        showPalette: false,
+        showEditor: false,
+        connectionPending: null,
+        selectedConnectionId: null,
+      },
 
-	setNodes: (nodes) => set({ nodes }),
+      setNodes: (nodes) => set({ nodes }),
 
-	addNode: (type, position) =>
-		set((state) => {
-			const newNode: FlowNode = {
-				id: uuidv4(),
-				type,
-				position,
-				data: {
-					label: type === "message" ? "New Message" : "New Choice",
-					content: "",
-					options: type === "choice" ? [] : undefined,
-				},
-			};
-			return {
-				nodes: [...state.nodes, newNode],
-				selectedNodeId: newNode.id,
-				ui: { ...state.ui, showEditor: true },
-			};
-		}),
+      addNode: (type, position) =>
+        set((state) => {
+          const newNode: FlowNode = {
+            id: uuidv4(),
+            type,
+            position,
+            data: {
+              label: type === "message" ? "New Message" : "New Choice",
+              content: "",
+              options: type === "choice" ? [] : undefined,
+            },
+          };
+          return {
+            nodes: [...state.nodes, newNode],
+            selectedNodeId: newNode.id,
+            ui: { ...state.ui, showEditor: true },
+          };
+        }),
 
-	updateNode: (id, data) =>
-		set((state) => ({
-			nodes: state.nodes.map((node) =>
-				node.id === id ? { ...node, data: { ...node.data, ...data } } : node,
-			),
-		})),
+      updateNode: (id, data) =>
+        set((state) => ({
+          nodes: state.nodes.map((node) =>
+            node.id === id
+              ? { ...node, data: { ...node.data, ...data } }
+              : node,
+          ),
+        })),
 
-	moveNode: (id, position) =>
-		set((state) => ({
-			nodes: state.nodes.map((node) =>
-				node.id === id ? { ...node, position } : node,
-			),
-		})),
+      moveNode: (id, position) =>
+        set((state) => ({
+          nodes: state.nodes.map((node) =>
+            node.id === id ? { ...node, position } : node,
+          ),
+        })),
 
-	deleteNode: (id) =>
-		set((state) => ({
-			nodes: state.nodes.filter((node) => node.id !== id),
-			connections: state.connections.filter(
-				(connection) =>
-					connection.sourceId !== id && connection.targetId !== id,
-			),
-			selectedNodeId: state.selectedNodeId === id ? null : state.selectedNodeId,
-		})),
+      deleteNode: (id) =>
+        set((state) => ({
+          nodes: state.nodes.filter((node) => node.id !== id),
+          connections: state.connections.filter(
+            (connection) =>
+              connection.sourceId !== id && connection.targetId !== id,
+          ),
+          selectedNodeId:
+            state.selectedNodeId === id ? null : state.selectedNodeId,
+        })),
 
-	selectNode: (id) =>
-		set((state) => ({
-			selectedNodeId: id,
-			ui: {
-				...state.ui,
-				selectedConnectionId: id ? null : state.ui.selectedConnectionId,
-			},
-		})),
+      duplicateNode: (id) =>
+        set((state) => {
+          const sourceNode = state.nodes.find((node) => node.id === id);
+          if (!sourceNode) return state;
 
-	addConnection: (connection) =>
-		set((state) => ({
-			connections: [...state.connections, { ...connection, id: uuidv4() }],
-		})),
+          const duplicatedNode: FlowNode = {
+            ...sourceNode,
+            id: uuidv4(),
+            position: {
+              x: sourceNode.position.x + 40,
+              y: sourceNode.position.y + 40,
+            },
+            data: {
+              ...sourceNode.data,
+              options: sourceNode.data.options?.map((option) => ({
+                id: uuidv4(),
+                label: option.label,
+              })),
+            },
+          };
 
-	deleteConnection: (id) =>
-		set((state) => ({
-			connections: state.connections.filter(
-				(connection) => connection.id !== id,
-			),
-		})),
+          return {
+            nodes: [...state.nodes, duplicatedNode],
+            selectedNodeId: duplicatedNode.id,
+            ui: { ...state.ui, showEditor: true, selectedConnectionId: null },
+          };
+        }),
 
-	setConnections: (connections) => set({ connections }),
+      selectNode: (id) =>
+        set((state) => ({
+          selectedNodeId: id,
+          ui: {
+            ...state.ui,
+            selectedConnectionId: id ? null : state.ui.selectedConnectionId,
+          },
+        })),
 
-	setMode: (mode) => set({ mode }),
+      addConnection: (connection) =>
+        set((state) => ({
+          connections: [...state.connections, { ...connection, id: uuidv4() }],
+        })),
 
-	togglePalette: () =>
-		set((state) => ({
-			ui: { ...state.ui, showPalette: !state.ui.showPalette },
-		})),
+      deleteConnection: (id) =>
+        set((state) => ({
+          connections: state.connections.filter(
+            (connection) => connection.id !== id,
+          ),
+        })),
 
-	toggleEditor: () =>
-		set((state) => ({
-			ui: { ...state.ui, showEditor: !state.ui.showEditor },
-		})),
+      setConnections: (connections) => set({ connections }),
 
-	setEditorOpen: (open) =>
-		set((state) => ({
-			ui: { ...state.ui, showEditor: open },
-		})),
+      setMode: (mode) => set({ mode }),
 
-	setSelectedConnection: (id) =>
-		set((state) => ({
-			selectedNodeId: id ? null : state.selectedNodeId,
-			ui: { ...state.ui, selectedConnectionId: id },
-		})),
+      togglePalette: () =>
+        set((state) => ({
+          ui: { ...state.ui, showPalette: !state.ui.showPalette },
+        })),
 
-	startConnection: (sourceId, sourceHandle, mousePos) =>
-		set((state) => ({
-			ui: {
-				...state.ui,
-				connectionPending: { sourceId, sourceHandle, mousePos },
-			},
-		})),
+      toggleEditor: () =>
+        set((state) => ({
+          ui: { ...state.ui, showEditor: !state.ui.showEditor },
+        })),
 
-	updateConnectionMousePos: (mousePos) =>
-		set((state) => ({
-			ui: {
-				...state.ui,
-				connectionPending: state.ui.connectionPending
-					? { ...state.ui.connectionPending, mousePos }
-					: null,
-			},
-		})),
+      setEditorOpen: (open) =>
+        set((state) => ({
+          ui: { ...state.ui, showEditor: open },
+        })),
 
-	endConnection: () =>
-		set((state) => ({
-			ui: { ...state.ui, connectionPending: null },
-		})),
-}));
+      setSelectedConnection: (id) =>
+        set((state) => ({
+          selectedNodeId: id ? null : state.selectedNodeId,
+          ui: { ...state.ui, selectedConnectionId: id },
+        })),
+
+      startConnection: (sourceId, sourceHandle, mousePos) =>
+        set((state) => ({
+          ui: {
+            ...state.ui,
+            connectionPending: { sourceId, sourceHandle, mousePos },
+          },
+        })),
+
+      updateConnectionMousePos: (mousePos) =>
+        set((state) => ({
+          ui: {
+            ...state.ui,
+            connectionPending: state.ui.connectionPending
+              ? { ...state.ui.connectionPending, mousePos }
+              : null,
+          },
+        })),
+
+      endConnection: () =>
+        set((state) => ({
+          ui: { ...state.ui, connectionPending: null },
+        })),
+    }),
+    {
+      name: "flow",
+      storage: createJSONStorage(() => localStorage),
+    },
+  ),
+);
